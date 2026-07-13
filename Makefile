@@ -1,4 +1,4 @@
-.PHONY: deps ui test build dev
+.PHONY: deps ui build dev
 
 deps:
 	go mod download
@@ -7,9 +7,6 @@ deps:
 ui:
 	pnpm --dir web build
 	touch web/dist/.placeholder
-
-test:
-	go test ./...
 
 build: ui
 	go build -o bin/trellis .
