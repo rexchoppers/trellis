@@ -1,15 +1,21 @@
-.PHONY: deps ui build dev
+.PHONY: deps dev build bindings check
+
+WAILS := $(shell go env GOPATH)/bin/wails
 
 deps:
+	go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
 	go mod download
-	pnpm --dir web install
+	pnpm --dir frontend install
 
-ui:
-	pnpm --dir web build
-	touch web/dist/.placeholder
+dev:
+	$(WAILS) dev
 
-build: ui
-	go build -o bin/trellis .
+build:
+	$(WAILS) build -clean
 
-dev: ui
-	go run .
+bindings:
+	$(WAILS) generate module
+
+check:
+	go vet ./...
+	pnpm --dir frontend exec tsc --noEmit
