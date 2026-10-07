@@ -5,8 +5,6 @@ import (
 	"log"
 
 	"github.com/rexchoppers/trellis/internal/config"
-	"github.com/rexchoppers/trellis/internal/linear"
-	"github.com/rexchoppers/trellis/internal/secrets"
 	"github.com/rexchoppers/trellis/internal/setup"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -22,11 +20,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	app := NewApp(&setup.Service{
-		ConfigDir: dir,
-		Secrets:   secrets.Keychain{Service: "trellis"},
-		Linear:    linear.NewClient(),
-	})
+	app := NewApp(&setup.Service{ConfigDir: dir})
 
 	err = wails.Run(&options.App{
 		Title:            "Trellis",
