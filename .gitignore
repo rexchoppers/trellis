@@ -1,12 +1,13 @@
-bin/
+build/bin
 node_modules/
+frontend/dist/*
+!frontend/dist/.placeholder
 *.db
 *.db-shm
 *.db-wal
 *.db.bak
 trellis-data/
 trellis-export.json
-web/dist/*
-!web/dist/.placeholder
 .env
 .idea
+
