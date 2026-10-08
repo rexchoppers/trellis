@@ -26,5 +26,9 @@ models: blender
 	$(BLENDER) -b --factory-startup --python assets/scenes/corporate-office/office.py
 	$(BLENDER) -b --factory-startup --python assets/scenes/corporate-office/surfaces.py
 
+previews: blender
+	$(BLENDER) -b --factory-startup --python assets/scenes/corporate-office/city.py -- --preview
+	$(BLENDER) -b --factory-startup --python assets/scenes/corporate-office/office.py -- --preview
+
 blender:
 	@test -n "$(BLENDER)" || { echo "Blender not found. Install it from blender.org, or run: make models BLENDER=/path/to/blender"; exit 1; }
