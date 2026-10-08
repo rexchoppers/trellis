@@ -7,10 +7,6 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-func (a *App) Status() (setup.Status, error) {
-	return a.setup.Status()
-}
-
 func (a *App) ChooseFolder() (string, error) {
 	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{Title: "Choose the project folder"})
 }

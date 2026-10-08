@@ -11,8 +11,6 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// App is what the window calls. Every exported method becomes a function in frontend/wailsjs:
-// setup ones in bindings_setup.go, job ones in bindings_jobs.go.
 type App struct {
 	ctx   context.Context
 	setup *setup.Service
@@ -20,7 +18,6 @@ type App struct {
 	jobs  *jobs.Manager
 }
 
-// JobChanged is the "job" event: a job or its conversation changed.
 type JobChanged struct {
 	Path string `json:"path"`
 	ID   string `json:"id"`
@@ -60,7 +57,6 @@ func (a *App) manager(path string) (*jobs.Manager, string, error) {
 	return a.jobs, root, err
 }
 
-// withManager runs fn against the job manager, with the project's root.
 func (a *App) withManager(path string, fn func(m *jobs.Manager, root string) error) error {
 	m, root, err := a.manager(path)
 	if err != nil {
@@ -69,7 +65,6 @@ func (a *App) withManager(path string, fn func(m *jobs.Manager, root string) err
 	return fn(m, root)
 }
 
-// managed is withManager for a call that also returns a value.
 func managed[T any](a *App, path string, fn func(m *jobs.Manager, root string) (T, error)) (T, error) {
 	m, root, err := a.manager(path)
 	if err != nil {
