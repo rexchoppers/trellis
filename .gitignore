@@ -10,4 +10,6 @@ trellis-data/
 trellis-export.json
 .env
 .idea
-
+# Blender preview renders and backups
+assets/**/previews/
+assets/**/*.blend1
