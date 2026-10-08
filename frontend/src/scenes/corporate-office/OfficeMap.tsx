@@ -36,6 +36,7 @@ type Controls = {
 export default function OfficeMap({ departments, jobs: list = [], view, places = [], npcs: npcList = [], onAgent }: OfficeMapProps) {
   const wrap = useRef<HTMLDivElement>(null);
   const [seated, setSeated] = useState(true);
+  const [noclip, setNoclip] = useState(false);
   const viewRef = useRef(view);
   viewRef.current = view;
   const placesRef = useRef(places);
@@ -175,6 +176,7 @@ export default function OfficeMap({ departments, jobs: list = [], view, places =
     };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'KeyH' && !typing(e.target)) walkers.toggleHits();
+      else if (e.code === 'KeyN' && !typing(e.target)) setNoclip(rig.toggleNoclip());
       else rig.press(e);
     };
     canvas.addEventListener('pointerdown', onDown);
@@ -241,13 +243,20 @@ export default function OfficeMap({ departments, jobs: list = [], view, places =
   return (
     <div ref={wrap} className="absolute inset-0 touch-none overflow-hidden select-none" style={{ background: SKY }}>
       {view === 'desk' && !seated && (
-        <button type="button" className="absolute top-3 left-3 rounded-md bg-background/80 px-2 py-1 text-xs hover:bg-background" onClick={() => controls.current?.sit()}>
+        <button type="button" className="absolute top-3 left-3 rounded-md bg-background/80 px-2 py-1 text-xs hover:bg-background" onClick={() => {
+            controls.current?.sit();
+            setNoclip(false);
+          }}>
           Sit back down
         </button>
       )}
 
       <p className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-background/80 px-2 py-1 text-xs text-muted-foreground">
-        {view === 'bird' ? 'Drag to turn · scroll to zoom · click an agent' : 'Drag to look · WASD or arrow keys to walk · click an agent'}
+        {view === 'bird'
+          ? 'Drag to turn · scroll to zoom · click an agent'
+          : noclip
+            ? 'Noclip · WASD to fly · E up · Q down · Shift for speed · N to stop'
+            : 'Drag to look · WASD or arrow keys to walk · N to noclip · click an agent'}
       </p>
     </div>
   );

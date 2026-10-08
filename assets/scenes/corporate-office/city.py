@@ -20,10 +20,18 @@ PREVIEW = "--preview" in sys.argv
 
 TOWER_DEPTH = 140.0
 STREET = -TOWER_DEPTH
+BLOCK = 46.0
 ROAD = 14.0
 PITCH = BLOCK + ROAD
+REACH = 6
 # Keep clear of your own tower: the floor grows up to about 60 m across.
 CLEAR = 62.0
+FLOOR_H = 3.6
+BAY_W = 3.0
+# Fog is solid 320 m out, so blocks past this never show.
+CUTOFF = 340.0
+# Every camera stays within this many metres of your tower; a wall whose outside faces away from all of them is never built.
+SEEN_FROM = 250.0
 
 rand = random.Random(23)
 
@@ -110,9 +118,14 @@ MARKING = material("marking", colour=srgb("#d9d6c9"), rough=0.9)
 
 # Each material collects its faces in one mesh, so the city is a handful of draw calls.
 parts = {}
+# Cut parts are still generated, into a mesh that is thrown away, so the random draws and the kept skyline stay the same.
+discard = False
+scrap = bmesh.new()
 
 
 def mesh_for(mat):
+    if discard:
+        return scrap
     if mat.name not in parts:
         parts[mat.name] = (bmesh.new(), mat)
     return parts[mat.name][0]
@@ -131,6 +144,11 @@ def facade_uv(bm, face, origin_z):
         loop[uv].uv = (along / (BAY_W * 4), (co.z - origin_z) / (FLOOR_H * 4))
 
 
+def unseen(face):
+    n, c = face.normal, face.calc_center_median()
+    return abs(n.z) < 0.5 and n.x * c.x + n.y * c.y >= SEEN_FROM
+
+
 def box(mat, cx, cy, z0, w, d, h, roof=ROOF, uv=True):
     for target, faces in ((mat, "walls"), (roof, "top")):
         bm = mesh_for(target)
@@ -143,6 +161,9 @@ def box(mat, cx, cy, z0, w, d, h, roof=ROOF, uv=True):
         for q in quads:
             f = bm.faces.new([v[i] for i in q])
             f.normal_update()
+            if unseen(f):
+                bm.faces.remove(f)
+                continue
             if uv:
                 facade_uv(bm, f, STREET)
 
@@ -156,6 +177,9 @@ def prism(mat, cx, cy, z0, radius, h, sides=8, roof=ROOF):
         j = (i + 1) % sides
         f = bm.faces.new([low[i], low[j], high[j], high[i]])
         f.normal_update()
+        if unseen(f):
+            bm.faces.remove(f)
+            continue
         facade_uv(bm, f, STREET)
     bm = mesh_for(roof)
     top = [bm.verts.new((x, y, z0 + h)) for x, y in ring]
@@ -215,7 +239,8 @@ def tower(cx, cy, w, d, top):
 
 
 def city():
-    span = REACH * PITCH + PITCH / 2
+    global discard
+    span = min(REACH * PITCH + PITCH / 2, CUTOFF)
     flat(ASPHALT, -span, span, -span, span, STREET)
     for bi in range(-REACH, REACH + 1):
         for bj in range(-REACH, REACH + 1):
@@ -223,6 +248,7 @@ def city():
             if abs(bx) < CLEAR and abs(by) < CLEAR:
                 continue
             h = BLOCK / 2
+            discard = math.hypot(max(abs(bx) - h, 0), max(abs(by) - h, 0)) > CUTOFF
             box(PAVEMENT, bx, by, STREET, BLOCK, BLOCK, 0.2, roof=PAVEMENT, uv=False)
             flat(MARKING, bx + h + ROAD / 2 - 0.15, bx + h + ROAD / 2 + 0.15, by - h, by + h, STREET + 0.06)
             flat(MARKING, bx - h, bx + h, by + h + ROAD / 2 - 0.15, by + h + ROAD / 2 + 0.15, STREET + 0.06)
@@ -249,6 +275,7 @@ def city():
 def objects():
     made = []
     for name, (bm, mat) in parts.items():
+        bmesh.ops.delete(bm, geom=[v for v in bm.verts if not v.link_faces], context="VERTS")
         me = bpy.data.meshes.new(f"city_{name}")
         bm.normal_update()
         bm.to_mesh(me)

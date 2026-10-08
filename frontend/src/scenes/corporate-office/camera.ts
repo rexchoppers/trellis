@@ -19,6 +19,10 @@ const MOVE_KEYS: Record<string, string> = {
   ArrowLeft: 'a',
   KeyD: 'd',
   ArrowRight: 'd',
+  KeyE: 'up',
+  KeyQ: 'down',
+  ShiftLeft: 'fast',
+  ShiftRight: 'fast',
 };
 
 export const typing = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
@@ -32,7 +36,8 @@ export function cameraRig(camera: THREE.PerspectiveCamera, view: () => View, obs
     target: new THREE.Vector3(),
   };
   let frameSpan = 30;
-  const player = { ...SEAT, seated: true };
+  const player = { ...SEAT, seated: true, y: EYE_SEATED };
+  let noclip = false;
   const keys = new Set<string>();
   const camPos = new THREE.Vector3(30, 40, 30);
   const camTarget = new THREE.Vector3();
@@ -53,14 +58,26 @@ export function cameraRig(camera: THREE.PerspectiveCamera, view: () => View, obs
         fov: 40,
       };
     }
-    const eye = new THREE.Vector3(player.x, player.seated ? EYE_SEATED : EYE_STANDING, player.z);
+    const eye = new THREE.Vector3(player.x, noclip ? player.y : player.seated ? EYE_SEATED : EYE_STANDING, player.z);
     const look = new THREE.Vector3(Math.sin(player.yaw) * Math.cos(player.pitch), Math.sin(player.pitch), Math.cos(player.yaw) * Math.cos(player.pitch));
     return { pos: eye, target: eye.clone().add(look), fov: 72 };
   };
 
   const blocked = (x: number, z: number) => obstacles().some((o) => Math.abs(x - o.x) < o.hx + RADIUS && Math.abs(z - o.z) < o.hz + RADIUS);
 
+  const fly = (dt: number) => {
+    const forward = (keys.has('w') ? 1 : 0) - (keys.has('s') ? 1 : 0);
+    const side = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0);
+    const rise = (keys.has('up') ? 1 : 0) - (keys.has('down') ? 1 : 0);
+    const step = (keys.has('fast') ? 60 : 15) * dt;
+    const look = Math.cos(player.pitch);
+    player.x += (Math.sin(player.yaw) * look * forward - Math.cos(player.yaw) * side) * step;
+    player.z += (Math.cos(player.yaw) * look * forward + Math.sin(player.yaw) * side) * step;
+    player.y += (Math.sin(player.pitch) * forward + rise) * step;
+  };
+
   const walk = (dt: number) => {
+    if (noclip) return fly(dt);
     const forward = (keys.has('w') ? 1 : 0) - (keys.has('s') ? 1 : 0);
     const side = (keys.has('d') ? 1 : 0) - (keys.has('a') ? 1 : 0);
     if (!forward && !side) return;
@@ -102,6 +119,8 @@ export function cameraRig(camera: THREE.PerspectiveCamera, view: () => View, obs
       camera.position.copy(camPos);
       camera.lookAt(camTarget);
       camera.fov = camFov;
+      // Fog is solid 320 m out; bird's eye can sit further back than that from the floor.
+      camera.far = atDesk ? 340 : 800;
       camera.updateProjectionMatrix();
     },
     drag: (dx: number, dy: number) => {
@@ -110,7 +129,7 @@ export function cameraRig(camera: THREE.PerspectiveCamera, view: () => View, obs
         bird.pitch = clamp(bird.pitch + dy * 0.004, 0.35, 1.45);
       } else {
         player.yaw -= dx * 0.005;
-        player.pitch = clamp(player.pitch - dy * 0.004, -1.1, 1.1);
+        player.pitch = clamp(player.pitch - dy * 0.004, noclip ? -1.55 : -1.1, noclip ? 1.55 : 1.1);
       }
     },
     zoom: (deltaY: number) => {
@@ -131,8 +150,21 @@ export function cameraRig(camera: THREE.PerspectiveCamera, view: () => View, obs
       changedAt = performance.now();
       keys.clear();
     },
+    toggleNoclip: () => {
+      if (view() !== 'desk') return noclip;
+      noclip = !noclip;
+      if (noclip) {
+        player.y = player.seated ? EYE_SEATED : EYE_STANDING;
+        player.seated = false;
+        onSeated(false);
+      } else {
+        player.pitch = clamp(player.pitch, -1.1, 1.1);
+      }
+      return noclip;
+    },
     sit: () => {
-      Object.assign(player, SEAT, { seated: true });
+      noclip = false;
+      Object.assign(player, SEAT, { seated: true, y: EYE_SEATED });
       changedAt = performance.now();
       onSeated(true);
     },
