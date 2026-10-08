@@ -13,3 +13,7 @@ trellis-export.json
 # Blender preview renders and backups
 assets/**/previews/
 assets/**/*.blend1
+
+# Local build state
+frontend/package.json.md5
+frontend/tsconfig.tsbuildinfo
