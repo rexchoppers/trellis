@@ -5,7 +5,11 @@
 #                 chair is on -z and the screen faces it from +z
 #   exec_desk     your desk: origin at the desk's centre; you sit on +z facing -z
 #   plant         a potted plant, origin at the pot's base
-#   coffee_bar    origin at the middle of the rug; the counter faces +z, the shelf is on -z
+#   kitchen       12 x 8 m, origin at its centre on the floor; open to +z, its back wall on -z.
+#                 A kitchen run and a coffee bar along the back, tables at the front. Empties
+#                 carry a "marker" property the scene reads: serve (where the barista stands,
+#                 facing their customers), seat (a chair, facing its table) and block (an
+#                 area nobody walks through, w x d)
 #   lift_core     8 x 4 m, origin at its centre on the floor; the lift doors face +z
 #   pod_screen    the partitions of a pod of four desks: a felt spine along x between two
 #                 facing pairs and an end panel at each end; origin at the pod's centre.
@@ -129,6 +133,13 @@ M = {
     "trim": material("trim", "#f4f4f2", 0.4, 0.3),
     "felt": material("felt", "#9aa0a6", 0.95),
     "upholstery": material("upholstery", "#3b4250", 0.9),
+    "tile": material("tile", "#dcd6cc", 0.55),
+    "grout": material("grout", "#bdb5a8", 0.9),
+    "kitchen_wall": material("kitchen_wall", "#ece6da", 0.85),
+    "sage": material("sage", "#8aa58f", 0.6),
+    "worktop": material("worktop", "#e6e3dd", 0.3),
+    "cabinet": material("cabinet", "#f4f2ed", 0.5),
+    "glass_dark": material("glass_dark", "#1b1f24", 0.1),
 }
 
 
@@ -288,45 +299,126 @@ def plant():
         blob(p, M["leaf" if k % 2 else "leaf_light"], r, dx, dy, dz, squash=0.85)
 
 
-def coffee_bar():
-    p = piece("coffee_bar")
-    box(p, M["rug"], 8, 0.01, 6.4, 0, 0.012, 0, round_=0)
-    # Counter: oak front, dark stone top.
-    box(p, M["oak"], 4.4, 1.0, 0.8, 0, 0.5, 0.6, round_=0.01)
+def marker(parent, kind, x, z, rot_y=0.0, w=0.0, d=0.0):
+    """An empty the scene reads by its "marker" property; merge() keeps it."""
+    obj = bpy.data.objects.new(f"{parent.name}_{kind}", None)
+    bpy.context.scene.collection.objects.link(obj)
+    obj["marker"] = kind
+    if w:
+        obj["w"], obj["d"] = w, d
+    return place(obj, parent, x, 0, z, rot_y)
+
+
+def coffee_counter(p, cx, cz):
+    """The coffee bar: an oak counter facing +z at cz with the machine on it, a back shelf
+    of jars 1.6 m behind under a menu board, and two stools out front."""
+    box(p, M["oak"], 4.4, 1.0, 0.8, cx, 0.5, cz, round_=0.01)
     for k in range(-5, 6):
-        box(p, M["walnut"], 0.04, 0.9, 0.02, k * 0.38, 0.5, 1.0, round_=0)
-    box(p, M["stone_dark"], 4.6, 0.06, 1.0, 0, 1.03, 0.6, round_=0.01)
-    # Espresso machine, grinder and cups.
-    box(p, M["alu"], 0.75, 0.5, 0.5, -1.3, 1.31, 0.45, round_=0.03)
-    box(p, M["bezel"], 0.6, 0.08, 0.3, -1.3, 1.1, 0.62, round_=0.01)
-    box(p, M["red"], 0.06, 0.06, 0.02, -1.05, 1.42, 0.71, round_=0)
+        box(p, M["walnut"], 0.04, 0.9, 0.02, cx + k * 0.38, 0.5, cz + 0.4, round_=0)
+    box(p, M["stone_dark"], 4.6, 0.06, 1.0, cx, 1.03, cz, round_=0.01)
+    box(p, M["alu"], 0.75, 0.5, 0.5, cx - 1.3, 1.31, cz - 0.15, round_=0.03)
+    box(p, M["bezel"], 0.6, 0.08, 0.3, cx - 1.3, 1.1, cz + 0.02, round_=0.01)
+    box(p, M["red"], 0.06, 0.06, 0.02, cx - 1.05, 1.42, cz + 0.11, round_=0)
     for dx in (-1.45, -1.15):
-        cyl(p, M["steel"], 0.025, 0.08, dx, 1.02 + 0.12, 0.68, verts=10)
-    cyl(p, M["bezel"], 0.1, 0.38, -0.6, 1.25, 0.5)
-    cyl(p, M["alu"], 0.08, 0.14, -0.6, 1.5, 0.5, r_top=0.11)
+        cyl(p, M["steel"], 0.025, 0.08, cx + dx, 1.14, cz + 0.08, verts=10)
+    cyl(p, M["bezel"], 0.1, 0.38, cx - 0.6, 1.25, cz - 0.1)
+    cyl(p, M["alu"], 0.08, 0.14, cx - 0.6, 1.5, cz - 0.1, r_top=0.11)
     for n in range(4):
-        cyl(p, M["cup"], 0.045, 0.1, 0.4 + n * 0.3, 1.11, 0.75, r_top=0.055)
-    # Back shelf with jars, and the menu board above it.
-    box(p, M["oak"], 4.4, 1.0, 0.45, 0, 0.5, -1.4, round_=0.01)
-    box(p, M["stone_dark"], 4.5, 0.04, 0.5, 0, 1.02, -1.4)
+        cyl(p, M["cup"], 0.045, 0.1, cx + 0.4 + n * 0.3, 1.11, cz + 0.15, r_top=0.055)
+    shelf = cz - 1.6
+    box(p, M["oak"], 4.4, 1.0, 0.45, cx, 0.5, shelf, round_=0.01)
+    box(p, M["stone_dark"], 4.5, 0.04, 0.5, cx, 1.02, shelf)
     for y in (1.55, 1.95):
-        box(p, M["oak"], 4.0, 0.04, 0.3, 0, y, -1.5)
+        box(p, M["oak"], 4.0, 0.04, 0.3, cx, y, shelf - 0.05)
         for n in range(8):
-            cyl(p, M["jar"], 0.06, 0.18, -1.7 + n * 0.48, y + 0.11, -1.5, verts=16)
-    box(p, M["chalk"], 2.2, 1.0, 0.05, 0, 2.55, -1.6, round_=0.01)
+            cyl(p, M["jar"], 0.06, 0.18, cx - 1.7 + n * 0.48, y + 0.11, shelf - 0.05, verts=16)
+    box(p, M["chalk"], 2.2, 1.0, 0.05, cx, 2.55, shelf - 0.2, round_=0.01)
     for n, length in enumerate((1.4, 1.1, 1.6, 0.9, 1.3)):
-        box(p, M["chalk_line"], length, 0.04, 0.005, -0.85 + length / 2, 2.85 - n * 0.14, -1.57, round_=0)
-    # Stools on the customer side.
+        box(p, M["chalk_line"], length, 0.04, 0.005, cx - 0.85 + length / 2, 2.85 - n * 0.14, shelf - 0.17, round_=0)
     for x in (-0.9, 0.9):
-        cyl(p, M["leather"], 0.21, 0.07, x, 0.78, 1.55)
-        cyl(p, M["steel"], 0.025, 0.72, x, 0.38, 1.55, verts=12)
-        cyl(p, M["steel"], 0.2, 0.02, x, 0.01, 1.55)
-        cyl(p, M["steel"], 0.17, 0.02, x, 0.3, 1.55, verts=20)
-    # A plant at the end of the counter.
-    pot = piece("coffee_bar_plant")
-    pot.parent = p
-    pot.location = to_blender(2.7, 0, 0.6)
-    plant_parts(pot)
+        cyl(p, M["leather"], 0.21, 0.07, cx + x, 0.78, cz + 0.95)
+        cyl(p, M["steel"], 0.025, 0.72, cx + x, 0.38, cz + 0.95, verts=12)
+        cyl(p, M["steel"], 0.2, 0.02, cx + x, 0.01, cz + 0.95)
+        cyl(p, M["steel"], 0.17, 0.02, cx + x, 0.3, cz + 0.95, verts=20)
+    marker(p, "serve", cx - 0.4, cz - 0.85)
+    marker(p, "block", cx, cz, w=4.6, d=1.0)
+    marker(p, "block", cx, shelf, w=4.6, d=0.6)
+
+
+def dining_chair(p, x, z, facing):
+    """A cafe chair; facing is the way someone sitting in it looks (+1 is +z)."""
+    back = -facing
+    box(p, M["oak"], 0.44, 0.04, 0.42, x, 0.46, z, round_=0.01)
+    box(p, M["oak"], 0.44, 0.42, 0.03, x, 0.7, z + back * 0.2, round_=0.01)
+    for sx in (-0.19, 0.19):
+        for sz in (-0.18, 0.18):
+            box(p, M["steel"], 0.03, 0.44, 0.03, x + sx, 0.22, z + sz, round_=0.003)
+    marker(p, "seat", x, z, 0.0 if facing > 0 else math.pi)
+
+
+def dining_table(p, x, z):
+    """A table for four: two chairs either side along x."""
+    box(p, M["oak"], 1.6, 0.04, 0.85, x, 0.74, z, round_=0.01)
+    for sx in (-0.7, 0.7):
+        box(p, M["steel"], 0.05, 0.72, 0.05, x + sx, 0.36, z - 0.3)
+        box(p, M["steel"], 0.05, 0.72, 0.05, x + sx, 0.36, z + 0.3)
+    cyl(p, M["cup"], 0.04, 0.09, x + 0.3, 0.805, z + 0.1, r_top=0.05)
+    for sx in (-0.4, 0.4):
+        dining_chair(p, x + sx, z - 0.72, 1)
+        dining_chair(p, x + sx, z + 0.72, -1)
+    marker(p, "block", x, z, w=1.7, d=2.3)
+
+
+def kitchen():
+    p = piece("kitchen")
+    w, d = 12, 8
+    # Tiled floor, grout lines every metre.
+    box(p, M["tile"], w, 0.012, d, 0, 0.008, 0, round_=0)
+    for k in range(1, w):
+        box(p, M["grout"], 0.02, 0.014, d, -w / 2 + k, 0.008, 0, round_=0)
+    for k in range(1, d):
+        box(p, M["grout"], w, 0.014, 0.02, 0, 0.008, -d / 2 + k, round_=0)
+    # The back wall, with a sage splashback over the run.
+    back = -d / 2 + 0.06
+    box(p, M["kitchen_wall"], w, 2.8, 0.12, 0, 1.4, back, round_=0.01)
+    marker(p, "block", 0, back, w=w, d=0.2)
+    run = back + 0.37
+    box(p, M["sage"], 5.0, 0.62, 0.02, -1.5, 1.23, back + 0.07, round_=0)
+    # Fridge and a tall cupboard at the left end.
+    box(p, M["alu"], 0.8, 2.0, 0.62, -5.3, 1.0, run, round_=0.02)
+    box(p, M["steel"], 0.03, 0.9, 0.03, -4.98, 1.25, run + 0.33, round_=0.005)
+    box(p, M["cabinet"], 0.8, 2.2, 0.62, -4.45, 1.1, run, round_=0.01)
+    box(p, M["steel"], 0.03, 0.4, 0.03, -4.15, 1.1, run + 0.33, round_=0.005)
+    # Base units under a pale stone worktop, a door every 60 cm.
+    box(p, M["cabinet"], 5.0, 0.86, 0.6, -1.5, 0.45, run, round_=0.01)
+    box(p, M["worktop"], 5.04, 0.04, 0.64, -1.5, 0.9, run, round_=0.005)
+    for k in range(8):
+        x = -3.7 + k * 0.6 + 0.3
+        box(p, M["steel"], 0.16, 0.02, 0.02, x, 0.78, run + 0.31, round_=0.003)
+        box(p, M["grout"], 0.008, 0.8, 0.005, x + 0.3, 0.45, run + 0.302, round_=0)
+    # Sink and tap, kettle, microwave.
+    box(p, M["steel"], 0.6, 0.02, 0.42, -2.6, 0.915, run, round_=0.005)
+    cyl(p, M["steel"], 0.015, 0.3, -2.6, 1.07, run - 0.22, verts=10)
+    box(p, M["steel"], 0.02, 0.02, 0.16, -2.6, 1.21, run - 0.15, round_=0.005)
+    cyl(p, M["bezel"], 0.08, 0.22, -1.5, 1.03, run - 0.05)
+    box(p, M["cabinet"], 0.5, 0.3, 0.38, -0.4, 1.07, run - 0.05, round_=0.02)
+    box(p, M["glass_dark"], 0.32, 0.2, 0.01, -0.46, 1.07, run + 0.145, round_=0)
+    # Wall cupboards over the run.
+    box(p, M["cabinet"], 5.0, 0.7, 0.35, -1.5, 2.0, back + 0.24, round_=0.01)
+    for k in range(8):
+        box(p, M["steel"], 0.16, 0.02, 0.02, -3.7 + k * 0.6 + 0.3, 1.7, back + 0.42, round_=0.003)
+    marker(p, "block", -2.25, run, w=7.5, d=0.7)
+    # The coffee bar on the right, its shelf against the back wall.
+    coffee_counter(p, 3.4, back + 1.9)
+    # Tables at the front.
+    for x in (-4.0, -1.2):
+        dining_table(p, x, 1.9)
+    # A plant in each front corner.
+    for x in (-5.5, 5.5):
+        pot = piece(f"kitchen_plant_{'l' if x < 0 else 'r'}")
+        pot.parent = p
+        pot.location = to_blender(x, 0, d / 2 - 0.5)
+        plant_parts(pot)
 
 
 def plant_parts(parent):
@@ -374,7 +466,7 @@ def merge():
             joined.matrix_world = matrix
             joined.name = f"{root.name}_{name}"
         for o in list(root.children_recursive):
-            if o.type == "EMPTY":
+            if o.type == "EMPTY" and "marker" not in o:
                 bpy.data.objects.remove(o)
 
 
@@ -431,7 +523,7 @@ def low_table():
 workstation()
 exec_desk()
 plant()
-coffee_bar()
+kitchen()
 lift_core()
 ceiling_light()
 pod_screen()
@@ -441,7 +533,7 @@ merge()
 
 os.makedirs(os.path.dirname(GLB), exist_ok=True)
 bpy.ops.wm.save_as_mainfile(filepath=BLEND)
-bpy.ops.export_scene.gltf(filepath=GLB, export_format="GLB", use_selection=False, export_apply=True, export_yup=True)
+bpy.ops.export_scene.gltf(filepath=GLB, export_format="GLB", use_selection=False, export_apply=True, export_yup=True, export_extras=True)
 print(f"office: {len([o for o in bpy.data.objects if o.parent is None])} pieces -> {GLB}")
 
 
@@ -451,7 +543,7 @@ def preview():
     bpy.ops.mesh.primitive_plane_add(size=40, location=(0, 0, 0))
     bpy.context.active_object.data.materials.append(material("floor", "#bdb6a8", 0.9))
     pieces = {o.name: o for o in bpy.data.objects if o.parent is None and o.type == "EMPTY"}
-    layout = {"workstation": (-3, 0, 0), "exec_desk": (2, 0, 0.4), "plant": (4.2, 0, -1), "coffee_bar": (0, 0, -9), "lift_core": (12, 0, -3)}
+    layout = {"workstation": (-3, 0, 0), "exec_desk": (2, 0, 0.4), "plant": (4.2, 0, -1), "kitchen": (0, 0, -10), "lift_core": (12, 0, -3)}
     pieces["ceiling_light"].location = to_blender(-15, 2.0, 0)
     for name, (x, y, z) in layout.items():
         pieces[name].location = to_blender(x, y, z)
@@ -488,7 +580,7 @@ def preview():
         "office-overview": (to_blender(6, 9, 10), to_blender(-1, 0, -2), 55),
         "office-your-desk": (to_blender(2, 1.2, 1.55), to_blender(2, 0.95, -1), 70),
         "office-workstations": (to_blender(-5, 1.7, 4), to_blender(-9, 0.7, 0), 50),
-        "office-coffee": (to_blender(0, 1.7, -3), to_blender(0, 1.2, -10), 60),
+        "office-kitchen": (to_blender(7, 7, -1), to_blender(0, 0.6, -10.5), 60),
         "office-ceiling-light": (to_blender(-14.6, 0.5, -0.4), to_blender(-15, 2.0, 0), 45),
     }
     for name, (eye, look, lens) in shots.items():
