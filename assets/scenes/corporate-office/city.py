@@ -1,11 +1,4 @@
-# The city around the corporate office tower: streets, blocks and towers, built in
-# Blender and exported as one glTF for the scene to load.
-#
-#   make models            builds city.blend and frontend/public/scenes/corporate-office/city.glb
-#   blender city.blend     open it to change anything by hand, then export again
-#
-# Units are metres. Blender is Z-up; the glTF export turns it Y-up for three.js.
-# Your floor is at height 0 and the street TOWER_DEPTH below it, as in world.ts.
+# Metres; Blender is Z-up, the glTF export turns it Y-up for three.js. The street is TOWER_DEPTH below your floor, as in floor.ts.
 
 import math
 import os
@@ -16,6 +9,10 @@ import bmesh
 import bpy
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# Import common.py from beside this script without writing __pycache__ into the assets.
+sys.path.insert(0, HERE)
+sys.dont_write_bytecode = True
+from common import render_previews, srgb  # noqa: E402
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 GLB = os.path.join(ROOT, "frontend", "public", "scenes", "corporate-office", "city.glb")
 BLEND = os.path.join(HERE, "city.blend")
@@ -23,30 +20,17 @@ PREVIEW = "--preview" in sys.argv
 
 TOWER_DEPTH = 140.0
 STREET = -TOWER_DEPTH
-BLOCK = 46.0  # one city block, kerb to kerb
 ROAD = 14.0
 PITCH = BLOCK + ROAD
-REACH = 6  # blocks out from the centre in each direction
 # Keep clear of your own tower: the floor grows up to about 60 m across.
 CLEAR = 62.0
-FLOOR_H = 3.6  # one storey on a facade
-BAY_W = 3.0  # one window bay
 
 rand = random.Random(23)
 
-
-def reset():
-    bpy.ops.wm.read_factory_settings(use_empty=True)
+bpy.ops.wm.read_factory_settings(use_empty=True)
 
 
-reset()
-
-
-# Facade textures, painted pixel by pixel. One tile is 4 bays across and 4 storeys up.
-#   grid:    a glass curtain wall, mullions and slab edges
-#   ribbon:  bands of glass between solid spandrels
-#   punched: windows set into a stone or brick wall
-#   fins:    glass behind tall vertical fins
+# One texture tile is 4 bays across and 4 storeys up (see facade_uv).
 def facade_image(name, style, glass, wall, vary):
     size = 256
     image = bpy.data.images.new(name, size, size, alpha=False)
@@ -66,13 +50,12 @@ def facade_image(name, style, glass, wall, vary):
             else:  # fins
                 solid = fx < 8 or fy < 3
             if solid:
-                # Walls weather a little, darker toward the slab.
                 c = tuple(ch * (0.92 + 0.08 * fy / tile) for ch in wall)
             else:
                 key = (storey, bay)
                 if key not in shade:
                     shade[key] = 1.0 + (rand.random() - 0.5) * vary
-                # Panes reflect more sky toward their top, and the odd blind is down.
+                # Brighter toward the top; the odd blind is down.
                 lift = 0.85 + 0.3 * fy / tile
                 c = tuple(min(1.0, ch * shade[key] * lift) for ch in glass)
                 if (storey * 7 + bay * 13) % 11 == 0 and fy > tile - 14:
@@ -100,17 +83,10 @@ def material(name, image=None, colour=(0.6, 0.6, 0.6), rough=0.8, metal=0.0):
     return mat
 
 
-def srgb(hex_colour):
-    h = hex_colour.lstrip("#")
-    c = [int(h[i : i + 2], 16) / 255 for i in (0, 2, 4)]
-    return tuple(ch / 12.92 if ch <= 0.04045 else ((ch + 0.055) / 1.055) ** 2.4 for ch in c)
-
-
 def facade(name, style, glass, wall, vary=0.3, rough=0.5):
     return material(name, facade_image(name, style, srgb(glass), srgb(wall), vary), rough=rough)
 
 
-# Towers: glass for the tall ones, stone, brick and concrete lower down.
 GLASS = [
     facade("glass_sky", "grid", "#7c9bb8", "#3a4350", 0.35, 0.3),
     facade("glass_slate", "grid", "#5f7385", "#2c333b", 0.3, 0.3),
@@ -156,7 +132,6 @@ def facade_uv(bm, face, origin_z):
 
 
 def box(mat, cx, cy, z0, w, d, h, roof=ROOF, uv=True):
-    """A box from z0 up h: walls in mat, top in roof."""
     for target, faces in ((mat, "walls"), (roof, "top")):
         bm = mesh_for(target)
         x0, x1, y0, y1, z1 = cx - w / 2, cx + w / 2, cy - d / 2, cy + d / 2, z0 + h
@@ -173,7 +148,6 @@ def box(mat, cx, cy, z0, w, d, h, roof=ROOF, uv=True):
 
 
 def prism(mat, cx, cy, z0, radius, h, sides=8, roof=ROOF):
-    """An n-sided tower, for the odd round one on the skyline."""
     ring = [(cx + radius * math.cos(2 * math.pi * i / sides + math.pi / sides), cy + radius * math.sin(2 * math.pi * i / sides + math.pi / sides)) for i in range(sides)]
     bm = mesh_for(mat)
     low = [bm.verts.new((x, y, z0)) for x, y in ring]
@@ -195,7 +169,6 @@ def flat(mat, x0, x1, y0, y1, z):
 
 
 def rooftop(cx, cy, top, w, d, tall):
-    """Plant rooms, and an antenna on the tall ones."""
     pw, pd = w * rand.uniform(0.3, 0.5), d * rand.uniform(0.3, 0.5)
     box(PLANT, cx + rand.uniform(-1, 1) * (w - pw) / 4, cy + rand.uniform(-1, 1) * (d - pd) / 4, top, pw, pd, rand.uniform(2.5, 4.5), uv=False)
     if rand.random() < 0.5:
@@ -213,12 +186,9 @@ def parapet(cx, cy, top, w, d, mat):
 
 
 def tower(cx, cy, w, d, top):
-    """One tower on a lot: a straight box, a stepped one, or a round one."""
     height = top - STREET
-    # Tall towers are mostly glass; low buildings mostly stone, brick and concrete.
     mat = rand.choice(GLASS if height > 90 or rand.random() < 0.3 else SOLID)
     if height > 220:
-        # A landmark: a slim spire on top.
         box(PLANT, cx, cy, top, 1.2, 1.2, rand.uniform(25, 45), uv=False)
     kind = rand.random()
     tall = top > 20
@@ -227,7 +197,6 @@ def tower(cx, cy, w, d, top):
         prism(mat, cx, cy, STREET, r, height, sides=rand.choice((8, 12)))
         rooftop(cx, cy, top, r, r, tall)
     elif kind < 0.5 and height > 60:
-        # Setbacks: each tier narrower than the one below.
         tiers = rand.choice((2, 3))
         z = STREET
         tw, td = w, d
@@ -238,7 +207,6 @@ def tower(cx, cy, w, d, top):
             tw, td = tw * rand.uniform(0.65, 0.8), td * rand.uniform(0.65, 0.8)
         rooftop(cx, cy, top, tw / 0.72, td / 0.72, tall)
     else:
-        # A podium on the street, then the shaft.
         if rand.random() < 0.4:
             box(rand.choice(FACADES[3:]), cx, cy, STREET, w + 4, d + 4, FLOOR_H * 3)
         box(mat, cx, cy, STREET, w, d, height)
@@ -255,23 +223,19 @@ def city():
             if abs(bx) < CLEAR and abs(by) < CLEAR:
                 continue
             h = BLOCK / 2
-            # Kerb and pavement, a little above the road.
             box(PAVEMENT, bx, by, STREET, BLOCK, BLOCK, 0.2, roof=PAVEMENT, uv=False)
-            # Lane markings down the road beside the block.
             flat(MARKING, bx + h + ROAD / 2 - 0.15, bx + h + ROAD / 2 + 0.15, by - h, by + h, STREET + 0.06)
             flat(MARKING, bx - h, bx + h, by + h + ROAD / 2 - 0.15, by + h + ROAD / 2 + 0.15, STREET + 0.06)
             dist = math.hypot(bx, by)
             if rand.random() < 0.08:
                 flat(PARK, bx - h + 3, bx + h - 3, by - h + 3, by + h - 3, STREET + 0.25)
                 continue
-            # Near blocks stay below your floor so they never block bird's eye;
-            # the skyline rises further out.
+            # Near blocks stay below your floor so they never block bird's eye.
             lots = rand.choice((1, 2, 2, 4))
             cells = {1: [(0, 0, 1, 1)], 2: [(-0.25, 0, 0.5, 1), (0.25, 0, 0.5, 1)] if rand.random() < 0.5 else [(0, -0.25, 1, 0.5), (0, 0.25, 1, 0.5)], 4: [(-0.25, -0.25, 0.5, 0.5), (0.25, -0.25, 0.5, 0.5), (-0.25, 0.25, 0.5, 0.5), (0.25, 0.25, 0.5, 0.5)]}[lots]
             for ox, oy, sw, sd in cells:
                 w = BLOCK * sw - rand.uniform(6, 12)
                 d = BLOCK * sd - rand.uniform(6, 12)
-                # Mostly mid-rise, with towers rising further out and the odd landmark.
                 roll = rand.random()
                 if dist < 140:
                     top = rand.uniform(-115, -20)
@@ -296,47 +260,18 @@ def objects():
     return made
 
 
-def preview(made):
-    """Renders two stills with a stand-in for your tower, which is not exported."""
-    scene = bpy.context.scene
-    # A grey floor plate and shaft where your tower stands.
+def preview():
+    """Your tower is not exported, so a stand-in takes its place for the stills."""
     bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, -TOWER_DEPTH / 2))
     stand = bpy.context.active_object
     stand.scale = (60, 50, TOWER_DEPTH)
     stand.data.materials.append(material("stand_in", colour=srgb("#3d4248")))
-    world = bpy.data.worlds.new("sky")
-    world.use_nodes = True
-    world.node_tree.nodes["Background"].inputs["Color"].default_value = (*srgb("#9cc8ec"), 1)
-    world.node_tree.nodes["Background"].inputs["Strength"].default_value = 1.0
-    scene.world = world
-    sun = bpy.data.objects.new("sun", bpy.data.lights.new("sun", "SUN"))
-    sun.data.energy = 4
-    sun.rotation_euler = (math.radians(50), 0, math.radians(35))
-    scene.collection.objects.link(sun)
-    engines = [e.identifier for e in bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items]
-    scene.render.engine = "BLENDER_EEVEE_NEXT" if "BLENDER_EEVEE_NEXT" in engines else "BLENDER_EEVEE"
-    scene.render.resolution_x, scene.render.resolution_y = 1600, 900
-    scene.view_settings.view_transform = "Standard"
-    cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
-    scene.collection.objects.link(cam)
-    scene.camera = cam
     shots = {
         "birds-eye": ((170, -230, 150), (0, 0, -40), 45),
         "from-your-floor": ((0, -24, 1.4), (0, -400, 15), 60),
         "street": ((-150, -330, -120), (0, 0, -40), 50),
     }
-    out = os.path.join(HERE, "previews")
-    os.makedirs(out, exist_ok=True)
-    from mathutils import Vector
-
-    for name, (eye, look, lens_deg) in shots.items():
-        cam.location = eye
-        direction = Vector(look) - Vector(eye)
-        cam.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
-        cam.data.angle = math.radians(lens_deg)
-        cam.data.clip_end = 2000
-        scene.render.filepath = os.path.join(out, f"{name}.png")
-        bpy.ops.render.render(write_still=True)
+    render_previews(shots, "#9cc8ec", 1.0, 4, 50, 35, "Standard", clip_end=2000)
     bpy.data.objects.remove(stand)
 
 
@@ -347,4 +282,4 @@ bpy.ops.wm.save_as_mainfile(filepath=BLEND)
 bpy.ops.export_scene.gltf(filepath=GLB, export_format="GLB", use_selection=False, export_apply=True, export_yup=True)
 print(f"city: {sum(len(o.data.polygons) for o in made)} faces in {len(made)} meshes -> {GLB}")
 if PREVIEW:
-    preview(made)
+    preview()

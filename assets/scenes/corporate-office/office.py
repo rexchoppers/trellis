@@ -1,28 +1,14 @@
-# The corporate office's furniture kit, built in Blender and exported as one glTF.
-# Each top-level object is one piece the scene places by name (world.ts, KIT):
-#
-#   workstation   an agent's desk: origin at the desk's centre on the floor; the
-#                 chair is on -z and the screen faces it from +z
-#   exec_desk     your desk: origin at the desk's centre; you sit on +z facing -z
-#   plant         a potted plant, origin at the pot's base
-#   kitchen       12 x 8 m, origin at its centre on the floor; open to +z, its back wall on -z.
-#                 A kitchen run and a coffee bar along the back, tables at the front. Empties
-#                 carry a "marker" property the scene reads: serve (where the barista stands,
-#                 facing their customers), seat (a chair, facing its table) and block (an
-#                 area nobody walks through, w x d)
-#   lift_core     8 x 4 m, origin at its centre on the floor; the lift doors face +z
-#   pod_screen    the partitions of a pod of four desks: a felt spine along x between two
-#                 facing pairs and an end panel at each end; origin at the pod's centre.
-#                 Its felt material ("felt") is tinted per department by the scene
-#   sofa          a three-seat sofa facing +z, origin at its centre on the floor
-#   low_table     a coffee table, origin at its centre on the floor
-#   ceiling_light a recessed LED panel, 1.2 x 0.6 m, long side on x; origin at the
-#                 ceiling's surface, the fitting reaching up into it and its face down
-#
-#   make models    builds office.blend and frontend/public/scenes/corporate-office/office.glb
-#
-# Positions below are written in three.js terms (x right, y up, z toward you) and turned
-# into Blender's Z-up axes on the way in; the glTF export turns them back.
+# Kit pieces (kit.ts KitPiece). Origin at the centre on the floor unless noted; +z is toward you.
+#   workstation    chair on -z, screen faces it from +z
+#   exec_desk      you sit on +z facing -z
+#   plant          origin at the pot's base
+#   kitchen        12 x 8 m, open to +z, back wall on -z; marker empties: serve, seat, block (w x d)
+#   lift_core      8 x 4 m, lift doors face +z
+#   pod_screen     felt spine along x between two facing desk pairs; "felt" material is tinted per department
+#   sofa           faces +z
+#   low_table      coffee table
+#   ceiling_light  1.2 x 0.6 m, long side on x; origin at the ceiling surface, face down
+# Positions are in three.js terms (x right, y up, z toward you); to_blender converts, the glTF export turns them back.
 
 import math
 import os
@@ -31,18 +17,17 @@ import sys
 import bpy
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+# Import common.py from beside this script without writing __pycache__ into the assets.
+sys.path.insert(0, HERE)
+sys.dont_write_bytecode = True
+from common import render_previews, srgb  # noqa: E402
+
 ROOT = os.path.abspath(os.path.join(HERE, "..", "..", ".."))
 GLB = os.path.join(ROOT, "frontend", "public", "scenes", "corporate-office", "office.glb")
 BLEND = os.path.join(HERE, "office.blend")
 PREVIEW = "--preview" in sys.argv
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-
-
-def srgb(hex_colour):
-    h = hex_colour.lstrip("#")
-    c = [int(h[i : i + 2], 16) / 255 for i in (0, 2, 4)]
-    return tuple(ch / 12.92 if ch <= 0.04045 else ((ch + 0.055) / 1.055) ** 2.4 for ch in c)
 
 
 def material(name, colour, rough=0.6, metal=0.0, glow=0.0):
@@ -59,7 +44,6 @@ def material(name, colour, rough=0.6, metal=0.0, glow=0.0):
 
 
 def screen_material():
-    """A screen showing a dark app: a sidebar, a header, panels and lines of text."""
     w, h = 256, 160
     image = bpy.data.images.new("screen_ui", w, h, alpha=False)
     bg, side, panel, line, accent = srgb("#141821"), srgb("#1c2230"), srgb("#222a3a"), srgb("#8e9bb3"), srgb("#5aa9ff")
@@ -103,7 +87,6 @@ M = {
     "alu": material("alu", "#b9bdc2", 0.3, 0.9),
     "bezel": material("bezel", "#16181c", 0.4),
     "screen": screen_material(),
-    "screen_dim": material("screen_dim", "#2a3f57", 0.2, glow=0.6),
     "keys": material("keys", "#d9dadc", 0.6),
     "fabric": material("fabric", "#30353d", 0.95),
     "mesh": material("mesh", "#1f2227", 0.8),
@@ -119,7 +102,6 @@ M = {
     "trunk": material("trunk", "#6b5236", 0.9),
     "oak": material("oak", "#b48a5f", 0.55),
     "stone_dark": material("stone_dark", "#2a2623", 0.35),
-    "rug": material("rug", "#4e3a2d", 1.0),
     "chalk": material("chalk", "#1e2124", 0.9),
     "chalk_line": material("chalk_line", "#e9e5dc", 0.9),
     "red": material("red", "#d4473b", 0.4, glow=0.5),
@@ -166,7 +148,7 @@ def bevel(obj, width):
 
 
 def box(parent, mat, w, h, d, x, y, z, rot_y=0.0, round_=0.006, name=None):
-    """A box w wide (x), h tall (y), d deep (z), centred on x, y, z."""
+    """w (x), h (y), d (z), centred on x, y, z."""
     bpy.ops.mesh.primitive_cube_add(size=1)
     obj = bpy.context.active_object
     obj.name = name or f"{parent.name}_{mat.name}"
@@ -178,7 +160,7 @@ def box(parent, mat, w, h, d, x, y, z, rot_y=0.0, round_=0.006, name=None):
 
 
 def cyl(parent, mat, r, h, x, y, z, verts=24, r_top=None, name=None):
-    """An upright cylinder (or cone, with r_top) centred on x, y, z."""
+    """Centred on x, y, z; a cone when r_top is set."""
     if r_top is None:
         bpy.ops.mesh.primitive_cylinder_add(vertices=verts, radius=r, depth=h)
     else:
@@ -209,10 +191,9 @@ def piece(name):
 
 
 def monitor(parent, x, z, face, width=0.62):
-    """A monitor on a stand; face is +1 when the screen looks toward +z."""
+    """face: +1 when the screen looks toward +z."""
     h = width * 0.58
     box(parent, M["bezel"], width, h, 0.03, x, 1.08, z, round_=0.01)
-    # The picture is a plane with the whole image on it, turned to read the right way round.
     bpy.ops.mesh.primitive_plane_add(size=1)
     glass = bpy.context.active_object
     glass.name = f"{parent.name}_screen"
@@ -226,7 +207,7 @@ def monitor(parent, x, z, face, width=0.62):
 
 
 def task_chair(parent, x, z, back):
-    """An office chair; back is the side (+1 or -1 on z) its backrest sits on."""
+    """back: the side (+1 or -1 on z) its backrest sits on."""
     box(parent, M["fabric"], 0.5, 0.08, 0.48, x, 0.47, z, round_=0.03)
     box(parent, M["mesh"], 0.46, 0.52, 0.05, x, 0.84, z + back * 0.25, round_=0.03)
     box(parent, M["steel"], 0.06, 0.2, 0.04, x, 0.6, z + back * 0.24)
@@ -269,16 +250,13 @@ def exec_desk():
     # One screen off to the left, so the view across the desk to your door stays clear.
     monitor(p, -0.9, -0.25, 1, width=0.66)
     box(p, M["keys"], 0.44, 0.02, 0.14, -0.75, 0.79, 0.12, round_=0.005)
-    # Lamp.
     cyl(p, M["brass"], 0.09, 0.02, 1.05, 0.79, -0.25)
     cyl(p, M["brass"], 0.012, 0.42, 1.05, 1.0, -0.25, verts=10)
     cyl(p, M["lamp_shade"], 0.16, 0.18, 1.05, 1.27, -0.25, r_top=0.1)
-    # Phone, with its green light.
     box(p, M["bezel"], 0.22, 0.05, 0.2, 0.62, 0.805, -0.1, round_=0.01)
     box(p, M["leather"], 0.24, 0.04, 0.07, 0.62, 0.85, -0.16, round_=0.015)
     box(p, M["green_light"], 0.02, 0.01, 0.02, 0.7, 0.835, -0.03, round_=0)
     cyl(p, M["ceramic"], 0.045, 0.1, 0.35, 0.83, 0.2)
-    # Executive chair: high leather back, on your side.
     box(p, M["leather"], 0.58, 0.1, 0.55, 0, 0.5, 1.2, round_=0.04)
     box(p, M["leather"], 0.56, 0.75, 0.08, 0, 0.98, 1.47, round_=0.04)
     for side in (-1, 1):
@@ -290,13 +268,18 @@ def exec_desk():
         box(p, M["alu"], 0.34, 0.03, 0.045, math.cos(a) * 0.17, 0.07, 1.2 + math.sin(a) * 0.17, rot_y=a)
 
 
+def plant_parts(parent, r, h, leaves):
+    """leaves: (dx, dy, dz, radius) each."""
+    cyl(parent, M["pot"], r, h, 0, h / 2, 0, r_top=r + 0.03, verts=28)
+    cyl(parent, M["soil"], r + 0.01, 0.02, 0, h - 0.01, 0)
+    for k, (dx, dy, dz, size) in enumerate(leaves):
+        blob(parent, M["leaf" if k % 2 else "leaf_light"], size, dx, dy, dz, squash=0.85)
+
+
 def plant():
     p = piece("plant")
-    cyl(p, M["pot"], 0.22, 0.42, 0, 0.21, 0, r_top=0.25, verts=28)
-    cyl(p, M["soil"], 0.23, 0.02, 0, 0.41, 0)
+    plant_parts(p, 0.22, 0.42, [(0, 1.15, 0, 0.32), (0.17, 0.95, 0.08, 0.24), (-0.16, 1.0, -0.06, 0.25), (0.05, 0.8, -0.18, 0.2), (-0.08, 1.35, 0.1, 0.2)])
     cyl(p, M["trunk"], 0.025, 0.7, 0, 0.75, 0, verts=8)
-    for k, (dx, dy, dz, r) in enumerate([(0, 1.15, 0, 0.32), (0.17, 0.95, 0.08, 0.24), (-0.16, 1.0, -0.06, 0.25), (0.05, 0.8, -0.18, 0.2), (-0.08, 1.35, 0.1, 0.2)]):
-        blob(p, M["leaf" if k % 2 else "leaf_light"], r, dx, dy, dz, squash=0.85)
 
 
 def marker(parent, kind, x, z, rot_y=0.0, w=0.0, d=0.0):
@@ -310,8 +293,6 @@ def marker(parent, kind, x, z, rot_y=0.0, w=0.0, d=0.0):
 
 
 def coffee_counter(p, cx, cz):
-    """The coffee bar: an oak counter facing +z at cz with the machine on it, a back shelf
-    of jars 1.6 m behind under a menu board, and two stools out front."""
     box(p, M["oak"], 4.4, 1.0, 0.8, cx, 0.5, cz, round_=0.01)
     for k in range(-5, 6):
         box(p, M["walnut"], 0.04, 0.9, 0.02, cx + k * 0.38, 0.5, cz + 0.4, round_=0)
@@ -346,7 +327,7 @@ def coffee_counter(p, cx, cz):
 
 
 def dining_chair(p, x, z, facing):
-    """A cafe chair; facing is the way someone sitting in it looks (+1 is +z)."""
+    """facing: the way someone sitting in it looks (+1 is +z)."""
     back = -facing
     box(p, M["oak"], 0.44, 0.04, 0.42, x, 0.46, z, round_=0.01)
     box(p, M["oak"], 0.44, 0.42, 0.03, x, 0.7, z + back * 0.2, round_=0.01)
@@ -357,7 +338,6 @@ def dining_chair(p, x, z, facing):
 
 
 def dining_table(p, x, z):
-    """A table for four: two chairs either side along x."""
     box(p, M["oak"], 1.6, 0.04, 0.85, x, 0.74, z, round_=0.01)
     for sx in (-0.7, 0.7):
         box(p, M["steel"], 0.05, 0.72, 0.05, x + sx, 0.36, z - 0.3)
@@ -372,60 +352,44 @@ def dining_table(p, x, z):
 def kitchen():
     p = piece("kitchen")
     w, d = 12, 8
-    # Tiled floor, grout lines every metre.
     box(p, M["tile"], w, 0.012, d, 0, 0.008, 0, round_=0)
     for k in range(1, w):
         box(p, M["grout"], 0.02, 0.014, d, -w / 2 + k, 0.008, 0, round_=0)
     for k in range(1, d):
         box(p, M["grout"], w, 0.014, 0.02, 0, 0.008, -d / 2 + k, round_=0)
-    # The back wall, with a sage splashback over the run.
     back = -d / 2 + 0.06
     box(p, M["kitchen_wall"], w, 2.8, 0.12, 0, 1.4, back, round_=0.01)
     marker(p, "block", 0, back, w=w, d=0.2)
     run = back + 0.37
     box(p, M["sage"], 5.0, 0.62, 0.02, -1.5, 1.23, back + 0.07, round_=0)
-    # Fridge and a tall cupboard at the left end.
     box(p, M["alu"], 0.8, 2.0, 0.62, -5.3, 1.0, run, round_=0.02)
     box(p, M["steel"], 0.03, 0.9, 0.03, -4.98, 1.25, run + 0.33, round_=0.005)
     box(p, M["cabinet"], 0.8, 2.2, 0.62, -4.45, 1.1, run, round_=0.01)
     box(p, M["steel"], 0.03, 0.4, 0.03, -4.15, 1.1, run + 0.33, round_=0.005)
-    # Base units under a pale stone worktop, a door every 60 cm.
     box(p, M["cabinet"], 5.0, 0.86, 0.6, -1.5, 0.45, run, round_=0.01)
     box(p, M["worktop"], 5.04, 0.04, 0.64, -1.5, 0.9, run, round_=0.005)
     for k in range(8):
         x = -3.7 + k * 0.6 + 0.3
         box(p, M["steel"], 0.16, 0.02, 0.02, x, 0.78, run + 0.31, round_=0.003)
         box(p, M["grout"], 0.008, 0.8, 0.005, x + 0.3, 0.45, run + 0.302, round_=0)
-    # Sink and tap, kettle, microwave.
     box(p, M["steel"], 0.6, 0.02, 0.42, -2.6, 0.915, run, round_=0.005)
     cyl(p, M["steel"], 0.015, 0.3, -2.6, 1.07, run - 0.22, verts=10)
     box(p, M["steel"], 0.02, 0.02, 0.16, -2.6, 1.21, run - 0.15, round_=0.005)
     cyl(p, M["bezel"], 0.08, 0.22, -1.5, 1.03, run - 0.05)
     box(p, M["cabinet"], 0.5, 0.3, 0.38, -0.4, 1.07, run - 0.05, round_=0.02)
     box(p, M["glass_dark"], 0.32, 0.2, 0.01, -0.46, 1.07, run + 0.145, round_=0)
-    # Wall cupboards over the run.
     box(p, M["cabinet"], 5.0, 0.7, 0.35, -1.5, 2.0, back + 0.24, round_=0.01)
     for k in range(8):
         box(p, M["steel"], 0.16, 0.02, 0.02, -3.7 + k * 0.6 + 0.3, 1.7, back + 0.42, round_=0.003)
     marker(p, "block", -2.25, run, w=7.5, d=0.7)
-    # The coffee bar on the right, its shelf against the back wall.
     coffee_counter(p, 3.4, back + 1.9)
-    # Tables at the front.
     for x in (-4.0, -1.2):
         dining_table(p, x, 1.9)
-    # A plant in each front corner.
     for x in (-5.5, 5.5):
         pot = piece(f"kitchen_plant_{'l' if x < 0 else 'r'}")
         pot.parent = p
         pot.location = to_blender(x, 0, d / 2 - 0.5)
-        plant_parts(pot)
-
-
-def plant_parts(parent):
-    cyl(parent, M["pot"], 0.2, 0.38, 0, 0.19, 0, r_top=0.23, verts=28)
-    cyl(parent, M["soil"], 0.21, 0.02, 0, 0.37, 0)
-    for k, (dx, dy, dz, r) in enumerate([(0, 0.75, 0, 0.3), (0.15, 0.6, 0.08, 0.22), (-0.14, 0.62, -0.06, 0.22)]):
-        blob(parent, M["leaf" if k % 2 else "leaf_light"], r, dx, dy, dz, squash=0.85)
+        plant_parts(pot, 0.2, 0.38, [(0, 0.75, 0, 0.3), (0.15, 0.6, 0.08, 0.22), (-0.14, 0.62, -0.06, 0.22)])
 
 
 def lift_core():
@@ -471,16 +435,12 @@ def merge():
 
 
 def ceiling_light():
-    """A recessed troffer: a white trim flush with the ceiling, a bright diffuser set up
-    inside it, and a grid of polished louvres in front of the diffuser."""
     p = piece("ceiling_light")
     w, d = 1.2, 0.6
-    # Trim: four strips round the opening, flush with the ceiling.
     box(p, M["trim"], w + 0.06, 0.012, 0.04, 0, -0.006, -d / 2, round_=0.003)
     box(p, M["trim"], w + 0.06, 0.012, 0.04, 0, -0.006, d / 2, round_=0.003)
     box(p, M["trim"], 0.04, 0.012, d, -w / 2, -0.006, 0, round_=0.003)
     box(p, M["trim"], 0.04, 0.012, d, w / 2, -0.006, 0, round_=0.003)
-    # Diffuser recessed 6 cm, and the louvre grid hanging just below it.
     box(p, M["diffuser"], w - 0.02, 0.005, d - 0.02, 0, 0.06, 0, round_=0)
     for k in range(-2, 3):
         box(p, M["louvre"], 0.012, 0.05, d - 0.02, k * (w / 5), 0.032, 0, round_=0)
@@ -491,7 +451,6 @@ def ceiling_light():
 
 
 def pod_screen():
-    """Partitions for four desks, two facing two: a spine with a dark top rail, and end panels."""
     p = piece("pod_screen")
     box(p, M["felt"], 3.3, 1.2, 0.05, 0, 0.6, 0, round_=0.015)
     box(p, M["steel"], 3.32, 0.03, 0.07, 0, 1.215, 0, round_=0.005)
@@ -533,62 +492,55 @@ merge()
 
 os.makedirs(os.path.dirname(GLB), exist_ok=True)
 bpy.ops.wm.save_as_mainfile(filepath=BLEND)
+# export_extras carries the marker properties through to three.js userData.
 bpy.ops.export_scene.gltf(filepath=GLB, export_format="GLB", use_selection=False, export_apply=True, export_yup=True, export_extras=True)
 print(f"office: {len([o for o in bpy.data.objects if o.parent is None])} pieces -> {GLB}")
 
 
+def copy_piece(name, x, z, rot_y=0.0):
+    original = bpy.data.objects[name]
+    copy = original.copy()
+    bpy.context.scene.collection.objects.link(copy)
+    for child in list(original.children):
+        c = child.copy()
+        c.parent = copy
+        bpy.context.scene.collection.objects.link(c)
+    copy.location = to_blender(x, 0, z)
+    copy.rotation_euler = (0, 0, rot_y)
+
+
 def preview():
-    """Lays the kit out on a floor and renders it, for a look before it goes in the app."""
-    scene = bpy.context.scene
     bpy.ops.mesh.primitive_plane_add(size=40, location=(0, 0, 0))
     bpy.context.active_object.data.materials.append(material("floor", "#bdb6a8", 0.9))
     pieces = {o.name: o for o in bpy.data.objects if o.parent is None and o.type == "EMPTY"}
-    layout = {"workstation": (-3, 0, 0), "exec_desk": (2, 0, 0.4), "plant": (4.2, 0, -1), "kitchen": (0, 0, -10), "lift_core": (12, 0, -3)}
+    layout = {
+        "workstation": (-3, 0, 0),
+        "exec_desk": (2, 0, 0.4),
+        "plant": (4.2, 0, -1),
+        "kitchen": (0, 0, -10),
+        "lift_core": (12, 0, -3),
+        "sofa": (0.5, 0, -3.3),
+        "low_table": (0.5, 0, -2.1),
+        "pod_screen": (-9, 0, 7.5),
+    }
     pieces["ceiling_light"].location = to_blender(-15, 2.0, 0)
     for name, (x, y, z) in layout.items():
         pieces[name].location = to_blender(x, y, z)
     for k in range(3):
         for j in range(2):
-            ws = pieces["workstation"].copy()
-            scene.collection.objects.link(ws)
-            for child in list(pieces["workstation"].children):
-                c = child.copy()
-                c.parent = ws
-                scene.collection.objects.link(c)
-            ws.location = to_blender(-8 - j * 2.2, 0, -1 + k * 2.2)
-    world = bpy.data.worlds.new("sky")
-    world.use_nodes = True
-    world.node_tree.nodes["Background"].inputs["Color"].default_value = (*srgb("#cfe2f2"), 1)
-    world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.8
-    scene.world = world
-    sun = bpy.data.objects.new("sun", bpy.data.lights.new("sun", "SUN"))
-    sun.data.energy = 3.5
-    sun.rotation_euler = (math.radians(45), 0, math.radians(30))
-    scene.collection.objects.link(sun)
-    engines = [e.identifier for e in bpy.types.RenderSettings.bl_rna.properties["engine"].enum_items]
-    scene.render.engine = "BLENDER_EEVEE_NEXT" if "BLENDER_EEVEE_NEXT" in engines else "BLENDER_EEVEE"
-    scene.render.resolution_x, scene.render.resolution_y = 1600, 900
-    scene.view_settings.view_transform = "AgX"
-    cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
-    scene.collection.objects.link(cam)
-    scene.camera = cam
-    from mathutils import Vector
-
-    out = os.path.join(HERE, "previews")
-    os.makedirs(out, exist_ok=True)
+            copy_piece("workstation", -8 - j * 2.2, -1 + k * 2.2)
+    for dx in (-0.82, 0.82):
+        copy_piece("workstation", -9 + dx, 7.5 + 0.45, math.pi)
+        copy_piece("workstation", -9 + dx, 7.5 - 0.45)
     shots = {
         "office-overview": (to_blender(6, 9, 10), to_blender(-1, 0, -2), 55),
         "office-your-desk": (to_blender(2, 1.2, 1.55), to_blender(2, 0.95, -1), 70),
         "office-workstations": (to_blender(-5, 1.7, 4), to_blender(-9, 0.7, 0), 50),
+        "office-pod": (to_blender(-5.5, 3.2, 11.5), to_blender(-9, 0.6, 7.5), 50),
         "office-kitchen": (to_blender(7, 7, -1), to_blender(0, 0.6, -10.5), 60),
         "office-ceiling-light": (to_blender(-14.6, 0.5, -0.4), to_blender(-15, 2.0, 0), 45),
     }
-    for name, (eye, look, lens) in shots.items():
-        cam.location = eye
-        cam.rotation_euler = (Vector(look) - Vector(eye)).to_track_quat("-Z", "Y").to_euler()
-        cam.data.angle = math.radians(lens)
-        scene.render.filepath = os.path.join(out, f"{name}.png")
-        bpy.ops.render.render(write_still=True)
+    render_previews(shots, "#cfe2f2", 0.8, 3.5, 45, 30, "AgX")
 
 
 if PREVIEW:
