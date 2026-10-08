@@ -52,7 +52,7 @@ export function Conversation({
     setError(undefined);
     return call.catch((err) => setError(message(err)));
   };
-  const blocked = job.reason === 'permission' && thread.some((e) => e.kind === 'permission' && !e.decision);
+  const blocked = job.reason === 'permission' && thread.some((e) => (e.kind === 'permission' || e.kind === 'refused') && !e.decision);
   const answer = (entry: jobs.Entry, decision: string) => run(Answer(projectPath, job.id, entry.id, decision));
   const groups = group(thread);
 

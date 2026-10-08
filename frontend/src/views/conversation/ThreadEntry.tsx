@@ -200,6 +200,9 @@ export function ThreadEntry({
                   <button type="button" className="act" onClick={() => onAnswer(e, 'always')}>
                     Always
                   </button>
+                  <button type="button" className="act text-muted-foreground" onClick={() => onAnswer(e, 'deny')}>
+                    Deny
+                  </button>
                 </>
               )}
             </div>

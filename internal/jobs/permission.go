@@ -47,17 +47,15 @@ func (m *Manager) permission(l *live, tool string, input json.RawMessage) string
 			return deny(fmt.Sprintf("%s only works in the %s step, and %s. Call step with name %q and status active first, once that step really is where you are.", toolName(tool), strings.Join(owners, " or "), now, owners[0]))
 		}
 	}
+	kind := "permission"
 	switch agent.Classify(tool, input, l.names) {
 	case config.Free:
 		return allow(input)
 	case config.Never:
-		entry := m.say(l.root, l.id, Entry{From: "trellis", Kind: "refused", Tool: toolName(tool), Input: subject(l.dir, input), Text: tool})
-		l.mu.Lock()
-		l.refused[entry.ID] = input
-		l.mu.Unlock()
-		return deny("Not on this agent's list of allowed tools. Tell the human in check_in what you need and why.")
+		// Not on the agent's list: the agent still waits for the human, so nothing it says next lands under an open question.
+		kind = "refused"
 	}
-	entry := m.say(l.root, l.id, Entry{From: "trellis", Kind: "permission", Tool: toolName(tool), Input: subject(l.dir, input), Text: tool})
+	entry := m.say(l.root, l.id, Entry{From: "trellis", Kind: kind, Tool: toolName(tool), Input: subject(l.dir, input), Text: tool})
 	wait := make(chan string, 1)
 	l.mu.Lock()
 	l.waits[entry.ID] = wait
@@ -77,13 +75,16 @@ func (m *Manager) permission(l *live, tool string, input json.RawMessage) string
 	})
 	m.changed(l.root, l.id)
 	switch decision {
-	case "allow":
+	case "allow", "once":
 		return allow(input)
 	case "always":
 		m.always(l.root, l.id, l, tool, input)
 		return allow(input)
 	case "stopped":
 		return deny("The session is ending.")
+	}
+	if kind == "refused" {
+		return deny("Not on this agent's list of allowed tools, and the human said no. Tell them in check_in what you need and why.")
 	}
 	return deny("The human said no. Ask them in check_in if you need another way.")
 }
@@ -136,6 +137,14 @@ func (m *Manager) Answer(root, id string, entryID int, decision string) error {
 		return errors.New("Already answered")
 	}
 	l := m.liveJob(id)
+	if entry.Kind == "refused" && l != nil {
+		l.mu.Lock()
+		waiting := l.waits[entryID] != nil
+		l.mu.Unlock()
+		if waiting {
+			entry.Kind = "permission"
+		}
+	}
 	switch entry.Kind {
 	case "permission":
 		if l == nil {
@@ -154,22 +163,23 @@ func (m *Manager) Answer(root, id string, entryID int, decision string) error {
 		m.changed(root, id)
 		return nil
 	case "refused":
+		// Refused before the agent waited on refusals: it has moved on, so allowing tells it to try again.
 		if err := Decide(root, id, entryID, decision); err != nil {
 			return err
 		}
+		if decision == "deny" {
+			m.changed(root, id)
+			return nil
+		}
 		tool := entry.Text
-		var input json.RawMessage
-		if l != nil {
+		if l != nil && decision != "always" {
 			l.mu.Lock()
-			input = l.refused[entryID]
-			if decision != "always" {
-				l.once[tool] = true
-			}
+			l.once[tool] = true
 			l.mu.Unlock()
 		}
 		message := fmt.Sprintf("The human allowed %s this once. You can try again.", toolName(tool))
 		if decision == "always" {
-			m.always(root, id, l, tool, input)
+			m.always(root, id, l, tool, nil)
 			message = fmt.Sprintf("The human allowed %s from now on. You can try again.", toolName(tool))
 		}
 		m.changed(root, id)

@@ -105,7 +105,7 @@ func (m *Manager) run(root string, job Job, d config.Department, agent config.Ag
 		dir = job.Worktree
 	}
 	l := &live{root: root, id: job.ID, department: d, agent: agent, names: names, token: gate.NewToken(), dir: dir,
-		waits: map[int]chan string{}, refused: map[int]json.RawMessage{}, once: map[string]bool{}, calls: map[string]call{}}
+		waits: map[int]chan string{}, once: map[string]bool{}, calls: map[string]call{}}
 	// Only the MCP servers the agent's rules mention: every server is a process, and most agents use one or two.
 	used := map[string]mcpconf.Server{}
 	for name, server := range servers {

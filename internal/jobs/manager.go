@@ -36,9 +36,7 @@ type live struct {
 
 	mu    sync.Mutex
 	waits map[int]chan string
-	// Refused calls by entry id, so Always can drop the rule that caught them.
-	refused map[int]json.RawMessage
-	once    map[string]bool
+	once  map[string]bool
 	// Messages sent that the agent has not finished a turn for yet.
 	turns     int
 	checkedIn bool
