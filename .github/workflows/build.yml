@@ -1,0 +1,66 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: |
+          go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
+          go mod download
+          pnpm --dir frontend install --frozen-lockfile
+
+      - name: Build
+        run: wails build -clean -platform darwin/universal
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Package
+        run: |
+          app=$(ls -d build/bin/*.app | head -1)
+          mkdir dist
+          ditto -c -k --keepParent "$app" "dist/Trellis-macos-${GITHUB_SHA::7}.zip"
+          cat > dist/README.txt <<'TXT'
+          Trellis beta build (unsigned).
+
+          1. Unzip and move Trellis.app into Applications.
+          2. First time only: right-click Trellis.app and choose Open (it's unsigned).
+             If macOS still refuses, run: xattr -cr /Applications/Trellis.app
+          3. After that, open it like any app.
+
+          Needs Claude Code (run claude once to log in), git and gh installed.
+          TXT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trellis-macos-${{ github.sha }}
+          path: dist/
+          retention-days: 30
