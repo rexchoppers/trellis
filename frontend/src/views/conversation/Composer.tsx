@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { CancelJob, Finish, SendMessage } from '../../../wailsjs/go/main/App';
+import { CancelJob, Finish, ReviewComments, SendMessage } from '../../../wailsjs/go/main/App';
 import type { config, jobs } from '../../../wailsjs/go/models';
-import { stateLabel } from '@/lib/jobs';
+import { pullOf, stateLabel } from '@/lib/jobs';
 import { listenersFor } from '@/lib/thread';
 import { Select } from '../shared';
 
@@ -62,7 +62,26 @@ export function Composer({
     run(SendMessage(projectPath, job.id, text).then(() => setText(''))).finally(() => setSending(false));
   };
 
-  if (!open) return <p className="sign border-t px-5 py-3.5 text-[11px] text-muted-foreground">{stateLabel(job.state)}</p>;
+  const pr = pullOf(job);
+  if (!open)
+    return (
+      <div className="sign flex items-center gap-5 border-t px-5 py-3.5 text-[11px] text-muted-foreground">
+        {stateLabel(job.state)}
+        {pr && job.state === 'done' && (
+          <button
+            type="button"
+            className="act ml-auto"
+            disabled={sending}
+            onClick={() => {
+              setSending(true);
+              onSend();
+              run(ReviewComments(projectPath, job.id)).finally(() => setSending(false));
+            }}>
+            {sending ? <span className="working-dots">Fetching the review</span> : `Address review comments on PR #${pr.number}`}
+          </button>
+        )}
+      </div>
+    );
   return (
     <form onSubmit={send} className="grid gap-3 border-t px-5 py-3.5">
       <label htmlFor="feedback" className="sr-only">

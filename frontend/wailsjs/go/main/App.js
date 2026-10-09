@@ -34,6 +34,10 @@ export function Projects() {
   return window['go']['main']['App']['Projects']();
 }
 
+export function ReviewComments(arg1, arg2) {
+  return window['go']['main']['App']['ReviewComments'](arg1, arg2);
+}
+
 export function SaveProject(arg1) {
   return window['go']['main']['App']['SaveProject'](arg1);
 }

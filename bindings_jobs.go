@@ -48,3 +48,7 @@ func (a *App) Finish(path, id, outcome string) error {
 func (a *App) CancelJob(path, id string) error {
 	return a.withManager(path, func(m *jobs.Manager, root string) error { return m.Cancel(root, id) })
 }
+
+func (a *App) ReviewComments(path, id string) error {
+	return a.withManager(path, func(m *jobs.Manager, root string) error { return m.ReviewComments(root, id) })
+}

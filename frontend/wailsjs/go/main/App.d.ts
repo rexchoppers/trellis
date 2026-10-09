@@ -20,6 +20,8 @@ export function Jobs(arg1:string):Promise<Array<jobs.Job>>;
 
 export function Projects():Promise<Array<setup.ProjectStatus>>;
 
+export function ReviewComments(arg1:string,arg2:string):Promise<void>;
+
 export function SaveProject(arg1:setup.ProjectInput):Promise<setup.ProjectStatus>;
 
 export function SendMessage(arg1:string,arg2:string,arg3:string):Promise<void>;

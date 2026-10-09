@@ -108,11 +108,6 @@ func (m *Manager) sendBack(root string, job Job, agent config.Agent, outcome con
 		m.note(root, job.ID, "Couldn't send it back: "+err.Error())
 		return
 	}
-	d, back, err := findAgent(root, origin.Department, origin.Agent)
-	if err != nil {
-		m.note(root, job.ID, "Couldn't send it back: "+err.Error())
-		return
-	}
 	text := sentBack(agent.Name, outcome, data)
 	if origin.State == Working || origin.State == NeedsYou {
 		if err := m.Send(root, origin.ID, text); err != nil {
@@ -120,20 +115,32 @@ func (m *Manager) sendBack(root string, job Job, agent config.Agent, outcome con
 		}
 		return
 	}
-	count, err := busy(root, origin.Department, origin.Agent)
-	if err != nil {
+	entry := Entry{From: "trellis", Kind: "event", Text: agent.Name, Outcome: outcome.Name, Data: data}
+	if err := m.reopen(root, origin, entry, text); err != nil {
 		m.note(root, job.ID, "Couldn't send it back: "+err.Error())
 		return
 	}
+	_, back, _ := findAgent(root, origin.Department, origin.Agent)
+	m.note(root, job.ID, fmt.Sprintf("Sent back to %s, in their original job.", back.Name))
+}
+
+// reopen starts a finished job again in its own session and worktree, with entry on its thread and text as the agent's next message.
+func (m *Manager) reopen(root string, origin Job, entry Entry, text string) error {
+	d, back, err := findAgent(root, origin.Department, origin.Agent)
+	if err != nil {
+		return err
+	}
+	count, err := busy(root, origin.Department, origin.Agent)
+	if err != nil {
+		return err
+	}
 	if back.Desks.Full(count) {
-		m.note(root, job.ID, fmt.Sprintf("Couldn't send it back: %s has no free desk. Send %s a message once one is free.", back.Name, back.Name))
-		return
+		return fmt.Errorf("%s has no free desk. Send %s a message once one is free", back.Name, back.Name)
 	}
 	dir := origin.Worktree
 	if back.Worktree {
 		if dir, err = reopenWorktree(root, origin, back.Branches == "own"); err != nil {
-			m.note(root, job.ID, "Couldn't send it back: "+err.Error())
-			return
+			return err
 		}
 	}
 	reopened, err := m.update(root, origin.ID, func(j *Job) {
@@ -141,15 +148,14 @@ func (m *Manager) sendBack(root string, job Job, agent config.Agent, outcome con
 		resetProgress(j)
 	})
 	if err != nil {
-		m.note(root, job.ID, "Couldn't send it back: "+err.Error())
-		return
+		return err
 	}
-	m.say(root, origin.ID, Entry{From: "trellis", Kind: "event", Text: agent.Name, Outcome: outcome.Name, Data: data})
-	m.note(root, job.ID, fmt.Sprintf("Sent back to %s, in their original job.", back.Name))
+	m.say(root, origin.ID, entry)
 	m.changed(root, origin.ID)
 	if err := m.run(root, reopened, d, back, text); err != nil {
-		m.note(root, job.ID, "Couldn't restart "+back.Name+": "+err.Error())
+		return fmt.Errorf("couldn't restart %s: %w", back.Name, err)
 	}
+	return nil
 }
 
 func (m *Manager) publish(root string, job Job, d config.Department, agent config.Agent, outcome config.Outcome, given map[string]string) error {

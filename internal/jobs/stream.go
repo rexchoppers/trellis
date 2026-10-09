@@ -219,6 +219,10 @@ func (m *Manager) produced(l *live, c call, result string) {
 		if path := subject(l.dir, c.input); path != "" {
 			add = append(add, Produced{Kind: "file", Label: path})
 		}
+	case c.name == "Bash" && strings.Contains(string(c.input), "gh pr create"):
+		if match := pullURL.FindStringSubmatch(result); match != nil {
+			add = append(add, Produced{Kind: "pr", Label: "PR #" + match[3], URL: match[0]})
+		}
 	case strings.HasPrefix(c.name, "mcp__") && !strings.HasPrefix(c.name, "mcp__trellis__") && l.agent.Classify(c.name, c.input, l.names) != config.Free:
 		url := linearURL.FindString(result)
 		for _, id := range issueID.FindAllString(result, 3) {

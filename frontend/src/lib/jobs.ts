@@ -92,6 +92,14 @@ export const stateLabel = (state: string) => STATES[state]?.label ?? state;
 
 export const live = (job: jobs.Job) => job.state === 'working' || job.state === 'needs_you' || job.state === 'waiting';
 
+// The PR the job opened: Trellis's own, one the agent recorded, or one named in its outcome.
+export function pullOf(job: jobs.Job) {
+  const found = [job.pr, ...(job.produced ?? []).filter((p) => p.kind === 'pr').map((p) => p.url), ...Object.values(job.data ?? {})]
+    .map((text) => text?.match(/https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/(\d+)/))
+    .find(Boolean);
+  return found ? { url: found[0], number: found[1] } : undefined;
+}
+
 export const jobTask = (job: jobs.Job) => job.task.split('\n')[0] || 'Their choice';
 
 export const jobTitle = (job: jobs.Job) => (job.from ? `From ${job.from.agent} · ${job.from.event}` : jobTask(job));

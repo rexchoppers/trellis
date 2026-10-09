@@ -51,11 +51,13 @@ type Job struct {
 	Progress []Step            `yaml:"progress,omitempty" json:"progress"`
 	Doing    string            `yaml:"doing,omitempty" json:"doing"`
 	Produced []Produced        `yaml:"produced,omitempty" json:"produced"`
-	Created  time.Time         `yaml:"created" json:"created"`
-	NextWake time.Time         `yaml:"next_wake,omitempty" json:"nextWake"`
-	Handover string            `yaml:"handover,omitempty" json:"-"`
-	Parent   *Link             `yaml:"parent,omitempty" json:"parent"`
-	Children []Link            `yaml:"children,omitempty" json:"children"`
+	// When review comments on the job's PR were last sent to it.
+	Reviewed time.Time `yaml:"reviewed,omitempty" json:"-"`
+	Created  time.Time `yaml:"created" json:"created"`
+	NextWake time.Time `yaml:"next_wake,omitempty" json:"nextWake"`
+	Handover string    `yaml:"handover,omitempty" json:"-"`
+	Parent   *Link     `yaml:"parent,omitempty" json:"parent"`
+	Children []Link    `yaml:"children,omitempty" json:"children"`
 }
 
 func (j Job) Over() bool { return j.State == Done || j.State == Failed || j.State == Cancelled }
