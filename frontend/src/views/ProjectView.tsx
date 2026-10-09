@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import type { AgentHit, View as OfficeView } from '../scenes/corporate-office/OfficeMap';
 import { Conversation } from './Conversation';
 import { Flow } from './Flow';
+import { PRs } from './PRs';
 import { Tasks } from './Tasks';
 import { CloseButton, message, Swatch } from './shared';
 import { noDrag, TitleBar } from './TitleBar';
@@ -19,7 +20,7 @@ type ProjectViewProps = {
   onRemoved: () => void;
 };
 
-type View = 'office' | 'tasks' | 'flow';
+type View = 'office' | 'tasks' | 'prs' | 'flow';
 
 const NARROW = 900;
 
@@ -149,7 +150,7 @@ export function ProjectView({ project, switcher, onRemoved }: ProjectViewProps) 
       <TitleBar>
         {switcher}
         <nav className="flex h-full items-stretch gap-5" role="tablist" aria-label="View" style={noDrag}>
-          {(['office', 'tasks', 'flow'] as const).map((key) => (
+          {(['office', 'tasks', 'prs', 'flow'] as const).map((key) => (
             <button
               key={key}
               role="tab"
@@ -164,7 +165,7 @@ export function ProjectView({ project, switcher, onRemoved }: ProjectViewProps) 
                 if (narrow) setOpen(undefined);
               }}
             >
-              {key}
+              {key === 'prs' ? 'PRs' : key}
               {key === 'office' && needsYou > 0 && <span className="text-[var(--amber)] tabular-nums">{needsYou}</span>}
             </button>
           ))}
@@ -210,6 +211,7 @@ export function ProjectView({ project, switcher, onRemoved }: ProjectViewProps) 
             </p>
           )}
           {view === 'tasks' && <Tasks departments={departments} list={jobs} open={open} onOpen={setOpen} />}
+          {view === 'prs' && <PRs projectPath={project.path} departments={departments} list={jobs} open={open} onOpen={setOpen} />}
           {view === 'flow' && <Flow departments={departments} />}
           {dispatch && free?.d && free.a && (
             <Dispatch
@@ -239,7 +241,7 @@ export function ProjectView({ project, switcher, onRemoved }: ProjectViewProps) 
               who={{ name: who?.a?.name ?? job.agent, colour: who?.d?.colour ?? '#888', department: who?.d?.name ?? job.department }}
               agent={who?.a}
               departments={departments}
-              back={narrow ? (view === 'office' ? 'Office' : 'Tasks') : undefined}
+              back={narrow ? (view === 'office' ? 'Office' : view === 'prs' ? 'PRs' : 'Tasks') : undefined}
               onClose={() => setOpen(undefined)}
               onOpenJob={setOpen}
             />
