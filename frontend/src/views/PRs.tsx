@@ -24,7 +24,7 @@ export function PRs({ projectPath, departments, list, open, onOpen }: { projectP
   // Only PRs still open on GitHub; checked again every minute, so merged ones drop off.
   const urls = [...rows.keys()];
   const key = urls.join(' ');
-  const [openOn, setOpenOn] = useState<Record<string, boolean>>();
+  const [openOn, setOpenOn] = useState<Record<string, string>>();
   const [checkFailed, setCheckFailed] = useState<string>();
   useEffect(() => {
     if (!urls.length) return undefined;
@@ -40,7 +40,7 @@ export function PRs({ projectPath, departments, list, open, onOpen }: { projectP
       clearInterval(timer);
     };
   }, [projectPath, key]);
-  const shown = [...rows.values()].filter(({ pr }) => openOn?.[pr.url]);
+  const shown = [...rows.values()].filter(({ pr }) => openOn?.[pr.url] !== undefined);
 
   const rerun = (job: jobs.Job, pr: { url: string; number: string }) => {
     setSending(job.id);
@@ -67,7 +67,7 @@ export function PRs({ projectPath, departments, list, open, onOpen }: { projectP
           <thead>
             <tr>
               <th className={th}>PR</th>
-              <th className={th}>Task</th>
+              <th className={th}>Title</th>
               <th className={th}>Agent</th>
               <th className={th}>Status</th>
               <th className={th} />
@@ -84,7 +84,10 @@ export function PRs({ projectPath, departments, list, open, onOpen }: { projectP
                       #{pr.number}
                     </a>
                   </td>
-                  <td className={td}>{jobTask(job)}</td>
+                  <td className={td}>
+                    <span className="font-semibold">{openOn?.[pr.url]}</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">{jobTask(job)}</span>
+                  </td>
                   <td className={cn(td, 'whitespace-nowrap')}>
                     <Swatch colour={d?.colour} />
                     {a?.name ?? job.agent}

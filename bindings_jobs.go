@@ -53,7 +53,7 @@ func (a *App) ReviewComments(path, id string) error {
 	return a.withManager(path, func(m *jobs.Manager, root string) error { return m.ReviewComments(root, id) })
 }
 
-func (a *App) OpenPulls(path string, urls []string) (map[string]bool, error) {
+func (a *App) OpenPulls(path string, urls []string) (map[string]string, error) {
 	root, err := setup.ProjectRoot(path)
 	if err != nil {
 		return nil, err

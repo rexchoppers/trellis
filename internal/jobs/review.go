@@ -183,31 +183,29 @@ func quote(text string) string {
 	return strings.Join(lines, "\n")
 }
 
-// OpenPulls says which of the given PR links are still open, with one gh call per repository.
-func OpenPulls(root string, urls []string) (map[string]bool, error) {
+// OpenPulls gives the title of each of the given PR links that is still open, with one gh call per repository.
+func OpenPulls(root string, urls []string) (map[string]string, error) {
 	repos := map[string]bool{}
 	for _, url := range urls {
 		if match := pullURL.FindStringSubmatch(url); match != nil {
 			repos[match[1]+"/"+match[2]] = true
 		}
 	}
-	open := map[string]bool{}
+	open := map[string]string{}
 	for repo := range repos {
-		out, err := capture(root, "gh", "pr", "list", "--repo", repo, "--state", "open", "--limit", "500", "--json", "url")
+		out, err := capture(root, "gh", "pr", "list", "--repo", repo, "--state", "open", "--limit", "500", "--json", "url,title")
 		if err != nil {
 			return nil, fmt.Errorf("gh pr list: %w", err)
 		}
-		var pulls []struct{ URL string }
+		var pulls []struct{ URL, Title string }
 		if err := json.Unmarshal([]byte(out), &pulls); err != nil {
 			return nil, err
 		}
 		for _, p := range pulls {
-			open[p.URL] = true
+			if slices.Contains(urls, p.URL) {
+				open[p.URL] = p.Title
+			}
 		}
 	}
-	result := map[string]bool{}
-	for _, url := range urls {
-		result[url] = open[url]
-	}
-	return result, nil
+	return open, nil
 }
