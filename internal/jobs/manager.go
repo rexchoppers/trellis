@@ -197,7 +197,7 @@ func (m *Manager) Recover(root string) {
 		}
 		thread, _ := Thread(root, job.ID)
 		for _, entry := range thread {
-			if entry.Kind == "permission" && entry.Decision == "" {
+			if (entry.Kind == "permission" || entry.Kind == "refused") && entry.Decision == "" {
 				_ = Decide(root, job.ID, entry.ID, "expired")
 			}
 		}
