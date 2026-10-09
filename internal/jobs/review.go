@@ -182,3 +182,32 @@ func quote(text string) string {
 	}
 	return strings.Join(lines, "\n")
 }
+
+// OpenPulls says which of the given PR links are still open, with one gh call per repository.
+func OpenPulls(root string, urls []string) (map[string]bool, error) {
+	repos := map[string]bool{}
+	for _, url := range urls {
+		if match := pullURL.FindStringSubmatch(url); match != nil {
+			repos[match[1]+"/"+match[2]] = true
+		}
+	}
+	open := map[string]bool{}
+	for repo := range repos {
+		out, err := capture(root, "gh", "pr", "list", "--repo", repo, "--state", "open", "--limit", "500", "--json", "url")
+		if err != nil {
+			return nil, fmt.Errorf("gh pr list: %w", err)
+		}
+		var pulls []struct{ URL string }
+		if err := json.Unmarshal([]byte(out), &pulls); err != nil {
+			return nil, err
+		}
+		for _, p := range pulls {
+			open[p.URL] = true
+		}
+	}
+	result := map[string]bool{}
+	for _, url := range urls {
+		result[url] = open[url]
+	}
+	return result, nil
+}

@@ -30,6 +30,10 @@ export function Jobs(arg1) {
   return window['go']['main']['App']['Jobs'](arg1);
 }
 
+export function OpenPulls(arg1, arg2) {
+  return window['go']['main']['App']['OpenPulls'](arg1, arg2);
+}
+
 export function Projects() {
   return window['go']['main']['App']['Projects']();
 }

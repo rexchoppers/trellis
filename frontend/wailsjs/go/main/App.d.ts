@@ -18,6 +18,8 @@ export function ForgetProject(arg1:string):Promise<void>;
 
 export function Jobs(arg1:string):Promise<Array<jobs.Job>>;
 
+export function OpenPulls(arg1:string,arg2:Array<string>):Promise<Record<string, boolean>>;
+
 export function Projects():Promise<Array<setup.ProjectStatus>>;
 
 export function ReviewComments(arg1:string,arg2:string):Promise<void>;

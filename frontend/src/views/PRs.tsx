@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { ReviewComments } from '../../wailsjs/go/main/App';
+import { useEffect, useState } from 'react';
+import { OpenPulls, ReviewComments } from '../../wailsjs/go/main/App';
 import type { config, jobs } from '../../wailsjs/go/models';
 import { findAgent, jobTask, live, pullOf, stateLabel } from '@/lib/jobs';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,27 @@ export function PRs({ projectPath, departments, list, open, onOpen }: { projectP
     rows.set(pr.url, { job, pr });
   }
 
+  // Only PRs still open on GitHub; checked again every minute, so merged ones drop off.
+  const urls = [...rows.keys()];
+  const key = urls.join(' ');
+  const [openOn, setOpenOn] = useState<Record<string, boolean>>();
+  const [checkFailed, setCheckFailed] = useState<string>();
+  useEffect(() => {
+    if (!urls.length) return undefined;
+    let alive = true;
+    const check = () =>
+      OpenPulls(projectPath, urls)
+        .then((states) => alive && (setOpenOn(states), setCheckFailed(undefined)))
+        .catch((err) => alive && setCheckFailed(message(err)));
+    check();
+    const timer = setInterval(check, 60_000);
+    return () => {
+      alive = false;
+      clearInterval(timer);
+    };
+  }, [projectPath, key]);
+  const shown = [...rows.values()].filter(({ pr }) => openOn?.[pr.url]);
+
   const rerun = (job: jobs.Job, pr: { url: string; number: string }) => {
     setSending(job.id);
     ReviewComments(projectPath, job.id)
@@ -34,8 +55,13 @@ export function PRs({ projectPath, departments, list, open, onOpen }: { projectP
       <p className="border-b px-8 py-5 text-sm text-[#c9c9c2]">
         Review a PR on GitHub, then send its open comments back to the agent that made it. It fixes them in the same job, replies on each thread and resolves it.
       </p>
-      {rows.size === 0 ? (
-        <p className="px-8 py-6 text-sm text-muted-foreground">No PRs from agents yet.</p>
+      {checkFailed && <p className="px-8 pt-4 text-sm text-destructive">Couldn't check GitHub: {checkFailed}</p>}
+      {!openOn && !checkFailed && rows.size > 0 ? (
+        <p className="px-8 py-6 text-sm text-muted-foreground">
+          <span className="working-dots">Checking GitHub for open PRs</span>
+        </p>
+      ) : shown.length === 0 ? (
+        <p className="px-8 py-6 text-sm text-muted-foreground">No open PRs from agents.</p>
       ) : (
         <table className="w-full border-collapse text-sm">
           <thead>
@@ -48,7 +74,7 @@ export function PRs({ projectPath, departments, list, open, onOpen }: { projectP
             </tr>
           </thead>
           <tbody>
-            {[...rows.values()].map(({ job, pr }) => {
+            {shown.map(({ job, pr }) => {
               const { d, a } = findAgent(departments, job.department, job.agent);
               const result = results[pr.url];
               return (
