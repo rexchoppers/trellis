@@ -14,7 +14,8 @@ const ZONE_DEPTH = 6.8;
 const ZONE_PAD = 0.9;
 const ZONE_GAP = 2.2;
 const AISLE = 3;
-const FRONT = 8.5;
+// Room in front of the lifts for reception and its name wall.
+const FRONT = 14.5;
 const MARGIN = 4;
 // The floor is never smaller than this, so there is room for departments to come.
 const MIN_HALF = 45;
@@ -36,6 +37,8 @@ type Zone = {
 const PLACE_KINDS: Record<string, { w: number; d: number }> = { kitchen: { w: 12, d: 8 } };
 const PLACE_GAP = 4;
 const CORE_HALF = 4;
+// The waiting room sits right of the lifts, against the front windows.
+const WAITING = { x0: 5.5, x1: 11.5, depth: 6 };
 
 type PlacedPlace = { place: config.Place; centre: THREE.Vector3; w: number; d: number };
 
@@ -46,6 +49,8 @@ export type Plan = {
   z0: number;
   z1: number;
   core: THREE.Vector3;
+  reception: THREE.Vector3;
+  waiting: { x0: number; x1: number; z0: number; z1: number; centre: THREE.Vector3 };
   places: PlacedPlace[];
   walkways: THREE.Vector3[];
 };
@@ -101,7 +106,7 @@ export function planFloor(departments: config.Department[], places: config.Place
   const stops = [-half + 1.5, ...zones.slice(1).map((zone) => zone.x0 - ZONE_GAP / 2), half - 1.5, ...zones.map((zone) => zone.centre.x)];
   for (const sx of stops) walkways.push(new THREE.Vector3(sx, 0, aisle), new THREE.Vector3(sx, 0, z0 - 2));
   // Places alternate either side of the lifts, each side filling outwards.
-  const reach = [CORE_HALF, CORE_HALF];
+  const reach = [CORE_HALF, WAITING.x1];
   const placed: PlacedPlace[] = [];
   for (const place of sortBy(places, [(p) => p.order ?? 0])) {
     const size = PLACE_KINDS[place.kind];
@@ -118,6 +123,8 @@ export function planFloor(departments: config.Department[], places: config.Place
     z0: front - 0.5,
     z1: OFFICE.hz + 0.1,
     core: new THREE.Vector3(0, 0, front + 2.5),
+    reception: new THREE.Vector3(0, 0, front + 9.5),
+    waiting: { x0: WAITING.x0, x1: WAITING.x1, z0: front - 0.5, z1: front - 0.5 + WAITING.depth, centre: new THREE.Vector3((WAITING.x0 + WAITING.x1) / 2, 0, front - 0.5 + WAITING.depth / 2) },
     places: placed,
     walkways,
   };

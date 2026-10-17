@@ -3,8 +3,10 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { config } from '../../../wailsjs/go/models';
 import { plural } from '@/lib/utils';
-import { boxIn, disposeGeometry, floorName, materials, plaque, shadows, slabIn, STOREY, type Obstacle } from './build';
+import { boxIn, callFace, disposeGeometry, exitSign, floorName, glassWalls, materials, plaque, shadows, signFace, slabIn, STOREY, type Obstacle } from './build';
 import { kitMarkers, placeKit, placeKitMany, type KitPiece, type Spot } from './kit';
+import { fireDoor } from './door';
+import { lifts } from './lifts';
 import { BAY, desksOf, OFFICE, planFloor, type Plan } from './plan';
 
 const TOWER_DEPTH = 140;
@@ -21,6 +23,11 @@ export type Floor = {
   ceiling: THREE.Group;
   rooms: Map<string, Room>;
   obstacles: Obstacle[];
+  // Call points to click, and their faces to swap when the alarm is up.
+  callPoints: THREE.Object3D[];
+  lifts: ReturnType<typeof lifts>;
+  stairDoor: ReturnType<typeof fireDoor>;
+  callFaces: { mesh: THREE.Mesh; normal: THREE.Material; pressed: THREE.Material }[];
   // Filled once ready settles.
   spots: Map<string, PlaceSpots>;
   ready: Promise<void>;
@@ -29,7 +36,7 @@ export type Floor = {
   dispose: () => void;
 };
 
-export function buildFloor(departments: config.Department[], places: config.Place[] = []): Floor {
+export function buildFloor(departments: config.Department[], places: config.Place[] = [], name = ''): Floor {
   const group = new THREE.Group();
   const m = materials();
   const glass: THREE.Mesh[] = [];
@@ -78,17 +85,90 @@ export function buildFloor(departments: config.Department[], places: config.Plac
   }
   obstacles.push({ x: cx, z: z0, hx: w / 2, hz: 0.1 }, { x: cx, z: z1, hx: w / 2, hz: 0.1 }, { x: x0, z: cz, hx: 0.1, hz: d / 2 }, { x: x1, z: cz, hx: 0.1, hz: d / 2 });
 
-  placeKit(group, 'lift_core', plan.core.x, plan.core.z);
+  // The core's own display and button faces are stand-ins: the lifts draw live ones over them.
+  placeKit(group, 'lift_core', plan.core.x, plan.core.z, 0, undefined, (model) =>
+    model.traverse((object) => {
+      if (object instanceof THREE.Mesh && ['lift_display', 'call_button'].includes((object.material as THREE.Material).name)) object.visible = false;
+    }),
+  );
+  const lift = lifts(group, plan.core);
   obstacles.push({ x: plan.core.x, z: plan.core.z, hx: 4, hz: 2 });
+
+  // Meeting rooms along the back windows either side of your office: a conference room left, two smaller rooms right.
+  const meetings = [
+    { key: 'conference', name: 'Conference room', piece: 'conference_room' as KitPiece, x0: -16.5, x1: -7.5 },
+    { key: 'meeting_1', name: 'Meeting room 1', piece: 'meeting_room' as KitPiece, x0: 7.5, x1: 12.5 },
+    { key: 'meeting_2', name: 'Meeting room 2', piece: 'meeting_room' as KitPiece, x0: 12.8, x1: 17.8 },
+  ];
+  const back = OFFICE.hz + 0.1;
+  for (const room of meetings) {
+    const door = room.x0 < 0 ? room.x1 - 1.4 : room.x0 + 1.4;
+    obstacles.push(...glassWalls(group, m, room.x0, room.x1, -OFFICE.hz, back, door, 0x2b303b, glass));
+    noShadow.push(plaque(group, m, new THREE.Vector3((room.x0 + room.x1) / 2, 0, -OFFICE.hz), new THREE.Vector3(0, 0, -1), room.name, null, '#2b303b', '#ffffff'));
+  }
+  // Fire alarm: UK call points on solid walls by the ways out; detectors with sounder-beacons on the ceiling.
+  // Each call point gets its own face, so the one pressed (and every other) shows it.
+  const callPoints: THREE.Object3D[] = [];
+  const callFaces: { mesh: THREE.Mesh; normal: THREE.Material; pressed: THREE.Material }[] = [];
+  const faceNormal = callFace(m, false);
+  const facePressed = callFace(m, true);
+  // facing: the way it looks, as an angle (0 is +z). On solid walls it is wall-mounted; by glass it stands on a post.
+  const callPoint = (piece: 'call_point' | 'call_post', x: number, z: number, facing: number) => {
+    callPoints.push(
+      placeKit(group, piece, x, z, facing, undefined, (model) =>
+        model.traverse((object) => {
+          if (object instanceof THREE.Mesh && (object.material as THREE.Material).name === 'call_face') {
+            object.material = faceNormal;
+            callFaces.push({ mesh: object, normal: faceNormal, pressed: facePressed });
+          }
+        }),
+      ),
+    );
+    if (piece === 'call_post') obstacles.push({ x, z, hx: 0.15, hz: 0.15 });
+  };
+  const coreFront = plan.core.z + 2 + 0.005;
+  for (const x of [-3.4, 3.4]) callPoint('call_point', x, coreFront, 0);
+  // The lift core's sides are solid wall too.
+  for (const side of [-1, 1]) callPoint('call_point', plan.core.x + side * 4.005, plan.core.z + 1.2, (side * Math.PI) / 2);
+  // One on a post outside your office door; the office front is glass.
+  callPoint('call_post', 1.9, -OFFICE.hz - 0.45, Math.PI);
+  for (const { centre, w, d } of plan.places) callPoint('call_point', centre.x + w / 2 - 0.6, centre.z - d / 2 + 0.13, 0);
+
+
+
+  // Reception faces the lifts with the project's name on its counter, and a glass waiting room to the right.
+  // Both are places an NPC can use: place: reception (serve) or place: waiting (seat).
+  const { reception, waiting } = plan;
+  // The fire stair is enclosed in the back corner on the right, its door facing the floor.
+  const stairs = new THREE.Vector3(x1 - 2.75, 0, z1 - 3.15);
+  callPoint('call_point', stairs.x - 0.9, stairs.z - 3.1 - 0.005, Math.PI);
+  // Its leaf hangs on the hinge at the stair-side face of the front wall, matching the frame in office.py.
+  const stairDoor = fireDoor(group, stairs.x - 2.18, stairs.z - 2.975);
+  const fixtures: { key: string; piece: KitPiece; centre: THREE.Vector3 }[] = [
+    { key: 'reception', piece: 'reception', centre: reception },
+    { key: 'waiting', piece: 'waiting_room', centre: waiting.centre },
+    { key: 'stairs', piece: 'stairwell', centre: stairs },
+    ...meetings.map((room) => ({ key: room.key, piece: room.piece, centre: new THREE.Vector3((room.x0 + room.x1) / 2, 0, (back - OFFICE.hz) / 2) })),
+  ];
+  const welcome = signFace(m, name || 'Welcome', 'Reception', '#ffc861');
+  const exit = exitSign(m);
+  obstacles.push(...glassWalls(group, m, waiting.x0, waiting.x1, waiting.z1, waiting.z0, waiting.x0 + 1.4, 0x2b303b, glass));
 
   // Blender marks serve/seat/block spots in each piece; they land once the kit has loaded.
   const spots = new Map<string, PlaceSpots>();
+  const placed = [...fixtures, ...plan.places.map(({ place, centre }) => ({ key: place.key, piece: place.kind as KitPiece, centre }))];
   const ready = Promise.all(
-    plan.places.map(async ({ place, centre }) => {
-      const piece = place.kind as KitPiece;
-      placeKit(group, piece, centre.x, centre.z);
+    placed.map(async ({ key, piece, centre }) => {
+      placeKit(group, piece, centre.x, centre.z, 0, undefined, (model) =>
+        model.traverse((object) => {
+          if (!(object instanceof THREE.Mesh)) return;
+          const name = (object.material as THREE.Material).name;
+          if (name === 'sign_face') object.material = welcome;
+          if (name === 'exit_sign') object.material = exit;
+        }),
+      );
       const here: PlaceSpots = { serve: [], seat: [] };
-      spots.set(place.key, here);
+      spots.set(key, here);
       for (const mark of await kitMarkers(piece)) {
         const at = new THREE.Vector3(centre.x + mark.x, 0, centre.z + mark.z);
         if (mark.kind === 'block') obstacles.push({ x: at.x, z: at.z, hx: mark.w / 2, hz: mark.d / 2 });
@@ -97,7 +177,7 @@ export function buildFloor(departments: config.Department[], places: config.Plac
     }),
   ).then(() => undefined);
 
-  // Built with the floor so it repaints once the pixel font has loaded.
+  // Built with the floor so it repaints once the sign font has loaded.
   noShadow.push(plaque(group, m, new THREE.Vector3(0, 0, -OFFICE.hz), new THREE.Vector3(0, 0, -1), 'Human', null, '#ffc861', '#1d1405'));
 
   const rooms = new Map<string, Room>();
@@ -111,7 +191,14 @@ export function buildFloor(departments: config.Department[], places: config.Plac
     const edge = new THREE.Vector3(zone.centre.x, 0, zone.z1);
     const agents = dept.agents?.length ?? 0;
     const line = agents ? `${plural(agents, 'agent')} · ${plural(desksOf(dept), 'desk')}` : 'No agents yet';
-    noShadow.push(plaque(room, m, edge, toYou, dept.name, line, dept.colour, '#ffffff'));
+    // The sign stands on a pillar in the middle of the department's desks, readable from both sides.
+    const face = signFace(m, dept.name, line, dept.colour);
+    placeKit(room, 'sign_pillar', zone.centre.x, zone.centre.z, 0, undefined, (model) =>
+      model.traverse((object) => {
+        if (object instanceof THREE.Mesh && (object.material as THREE.Material).name === 'sign_face') object.material = face;
+      }),
+    );
+    obstacles.push({ x: zone.centre.x, z: zone.centre.z, hx: 0.2, hz: 0.2 });
     noShadow.push(floorName(room, m, edge, toYou.clone().negate(), zone.z1 - zone.z0, zone.x1 - zone.x0, dept.name, `#${colour.clone().multiplyScalar(0.55).getHexString()}`));
     const felt = new THREE.Color(0x9aa0a6).lerp(colour, 0.6).getHex();
     for (const pod of zone.pods) {
@@ -138,8 +225,19 @@ export function buildFloor(departments: config.Department[], places: config.Plac
     const first = (from + to) / 2 - ((count - 1) * step) / 2;
     return range(count).map((i) => Math.round((first + i * step) / 0.6) * 0.6);
   };
-  for (const x of grid(x0, x1, 6)) for (const z of grid(z0, z1, 4.8)) lights.push({ x, y: STOREY - 0.075, z });
+  const columns = grid(x0, x1, 6);
+  const rows = grid(z0, z1, 4.8);
+  for (const x of columns) for (const z of rows) lights.push({ x, y: STOREY - 0.075, z });
   placeKitMany(ceiling, 'ceiling_light', lights);
+  // Combined detector and sounder-beacons sit in the gaps between light panels, half a row along from every other light.
+  const detectors: Spot[] = [];
+  columns.forEach((x, i) =>
+    rows.forEach((z, j) => {
+      if (j === rows.length - 1) return;
+      if (i % 2 === 0 && j % 2 === 0) detectors.push({ x, y: STOREY, z: z + 2.4 });
+    }),
+  );
+  placeKitMany(ceiling, 'smoke_detector', detectors);
   ceiling.visible = false;
   group.add(ceiling);
 
@@ -152,9 +250,14 @@ export function buildFloor(departments: config.Department[], places: config.Plac
     obstacles,
     spots,
     ready,
+    callPoints,
+    callFaces,
+    lifts: lift,
+    stairDoor,
     centre: new THREE.Vector3(cx, 0, cz),
     size: Math.max(w, d),
     dispose: () => {
+      lift.dispose();
       disposeGeometry(group);
       m.dispose();
     },

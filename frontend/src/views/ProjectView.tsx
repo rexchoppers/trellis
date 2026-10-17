@@ -195,6 +195,7 @@ export function ProjectView({ project, switcher, onRemoved }: ProjectViewProps) 
               departments={departments}
               jobs={jobs}
               view={officeView}
+              name={project.name}
               places={project.places}
               npcs={project.npcs}
               onAgent={(hit, at) => {

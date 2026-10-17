@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { config, jobs } from '../../../wailsjs/go/models';
 import { STOREY } from './build';
+import { fireAlarm } from './alarm';
 import { cameraRig, typing, type View } from './camera';
 import { reducedMotion } from './figure';
 import { buildFloor, fitSun, type Floor } from './floor';
@@ -19,6 +20,8 @@ type OfficeMapProps = {
   departments: config.Department[];
   jobs?: jobs.Job[];
   view: View;
+  // The project's name, on the wall behind reception.
+  name?: string;
   places?: config.Place[];
   npcs?: config.NPC[];
   onAgent: (hit: AgentHit, at: { x: number; y: number }) => void;
@@ -33,17 +36,19 @@ type Controls = {
   setDepartments: (departments: config.Department[]) => void;
 };
 
-export default function OfficeMap({ departments, jobs: list = [], view, places = [], npcs: npcList = [], onAgent }: OfficeMapProps) {
+export default function OfficeMap({ departments, jobs: list = [], view, name = '', places = [], npcs: npcList = [], onAgent }: OfficeMapProps) {
   const wrap = useRef<HTMLDivElement>(null);
   const [seated, setSeated] = useState(true);
   const [noclip, setNoclip] = useState(false);
   const viewRef = useRef(view);
   viewRef.current = view;
+  const nameRef = useRef(name);
+  nameRef.current = name;
   const placesRef = useRef(places);
   placesRef.current = places;
   const npcListRef = useRef(npcList);
   npcListRef.current = npcList;
-  const cast = JSON.stringify([places, npcList]);
+  const cast = JSON.stringify([name, places, npcList]);
   const handlers = useRef({ onAgent });
   handlers.current = { onAgent };
   const controls = useRef<Controls | null>(null);
@@ -102,6 +107,9 @@ export default function OfficeMap({ departments, jobs: list = [], view, places =
         }
       }
       walkers.update(dt, now);
+      alarm.update(now);
+      floor?.lifts.update(now);
+      floor?.stairDoor.update(now);
       rig.update(dt, now);
       renderer.render(world.scene, camera);
       walkers.label(camera, element.clientWidth, element.clientHeight);
@@ -115,7 +123,8 @@ export default function OfficeMap({ departments, jobs: list = [], view, places =
         world.scene.remove(floor.group);
         floor.dispose();
       }
-      floor = buildFloor(next, placesRef.current);
+      floor = buildFloor(next, placesRef.current, nameRef.current);
+      alarm.attach(floor.callFaces);
       world.scene.add(floor.group);
       npcs.place(floor, npcListRef.current);
       const keysNow = new Set(next.map((d) => d.key));
@@ -135,11 +144,33 @@ export default function OfficeMap({ departments, jobs: list = [], view, places =
     observer.observe(element);
     resize();
 
-    const pick = (e: PointerEvent) => {
-      if (!floor) return undefined;
+    const alarm = fireAlarm(element, world.scene);
+    const aim = (e: PointerEvent) => {
       const rect = canvas.getBoundingClientRect();
       ray.setFromCamera(new THREE.Vector2(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1), camera);
+    };
+    const pick = (e: PointerEvent) => {
+      if (!floor) return undefined;
+      aim(e);
       return walkers.pick(ray);
+    };
+    // A call point under the pointer.
+    const callPointAt = (e: PointerEvent) => {
+      if (!floor) return false;
+      aim(e);
+      const hit = ray.intersectObjects(floor.callPoints, true)[0];
+      return !!hit && hit.distance < 60;
+    };
+    const liftButtonAt = (e: PointerEvent) => {
+      if (!floor) return false;
+      aim(e);
+      return ray.intersectObject(floor.lifts.button, false).length > 0;
+    };
+    const stairDoorAt = (e: PointerEvent) => {
+      if (!floor) return false;
+      aim(e);
+      const hit = ray.intersectObject(floor.stairDoor.leaf, true)[0];
+      return !!hit && hit.distance < 60;
     };
 
     let drag: { x: number; y: number; moved: boolean } | null = null;
@@ -149,7 +180,7 @@ export default function OfficeMap({ departments, jobs: list = [], view, places =
     };
     const onMove = (e: PointerEvent) => {
       if (!drag) {
-        canvas.style.cursor = pick(e) ? 'pointer' : '';
+        canvas.style.cursor = pick(e) || callPointAt(e) || liftButtonAt(e) || stairDoorAt(e) ? 'pointer' : '';
         return;
       }
       const dx = e.clientX - drag.x;
@@ -163,6 +194,10 @@ export default function OfficeMap({ departments, jobs: list = [], view, places =
       const clicked = drag && !drag.moved;
       drag = null;
       if (!clicked) return;
+      // A call point is small and solid; if the click lands on one, that is what was aimed at.
+      if (callPointAt(e)) return alarm.toggle();
+      if (liftButtonAt(e)) return floor?.lifts.call();
+      if (stairDoorAt(e)) return floor?.stairDoor.toggle();
       const hit = pick(e);
       if (hit) open(hit, e);
     };
@@ -197,9 +232,9 @@ export default function OfficeMap({ departments, jobs: list = [], view, places =
       },
     };
     setDepartments(latest.current);
-    // Plaques are painted on canvases; repaint them once the pixel font has loaded.
+    // Signs are painted on canvases; repaint them once their font has loaded.
     let alive = true;
-    document.fonts?.load('700 64px "Pixelify Sans"').then(() => alive && setDepartments(latest.current));
+    document.fonts?.load('700 64px "Archivo Variable"').then(() => alive && setDepartments(latest.current));
     raf = requestAnimationFrame(frame);
 
     return () => {
@@ -218,6 +253,7 @@ export default function OfficeMap({ departments, jobs: list = [], view, places =
       walkers.dispose();
       npcs.dispose();
       floor?.dispose();
+      alarm.dispose();
       world.dispose();
       environment.dispose();
       pmrem.dispose();

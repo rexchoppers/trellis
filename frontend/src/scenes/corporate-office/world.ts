@@ -30,6 +30,7 @@ export function buildWorld(): World {
   sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048);
   sun.shadow.bias = -0.0005;
+  sun.shadow.normalBias = 0.02;
   scene.add(sun, sun.target);
 
   let disposed = false;

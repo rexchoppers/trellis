@@ -114,7 +114,7 @@ function textTexture(m: Materials, width: number, height: number, paint: (ctx: C
 
 function fitFont(ctx: CanvasRenderingContext2D, text: string, max: number, room: number) {
   let size = max;
-  do ctx.font = `700 ${size--}px "Pixelify Sans", ui-sans-serif, sans-serif`;
+  do ctx.font = `700 ${size--}px "Archivo Variable", ui-sans-serif, sans-serif`;
   while (ctx.measureText(text).width > room && size > 24);
 }
 
@@ -150,6 +150,136 @@ export function plaque(parent: THREE.Object3D, m: Materials, door: THREE.Vector3
 }
 
 // So zones can be told apart from bird's eye where their signs face away.
+// The face of a department's sign pillar: name large, agents and desks below, a strip in the department's colour.
+export function signFace(m: Materials, title: string, subtitle: string, colour: string) {
+  const w = 1024;
+  const h = 326;
+  const texture = textTexture(m, w, h, (ctx) => {
+    ctx.fillStyle = '#16181d';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = colour;
+    ctx.fillRect(0, h - 26, w, 26);
+    ctx.fillStyle = '#ffffff';
+    fitFont(ctx, title, 128, w - 96);
+    ctx.fillText(title, w / 2, 118);
+    ctx.fillStyle = '#b9bdc6';
+    ctx.font = '500 52px "Archivo Variable", ui-sans-serif, sans-serif';
+    ctx.fillText(subtitle, w / 2, 228);
+  });
+  texture.anisotropy = 8;
+  // The face comes from the glTF kit, whose UVs run top-down.
+  texture.flipY = false;
+  return m.own(new THREE.MeshBasicMaterial({ map: texture }));
+}
+
+// The face of a UK manual call point: a white push element on red, carrying the house-and-flame
+// symbol and PUSH HERE; pressed, the element shows yellow and black stripes as the real ones do.
+export function callFace(m: Materials, pressed: boolean) {
+  const size = 256;
+  const texture = textTexture(m, size, size, (ctx) => {
+    ctx.fillStyle = '#c8102e';
+    ctx.fillRect(0, 0, size, size);
+    const x = 30;
+    const y = 30;
+    const w = 196;
+    const h = 196;
+    if (pressed) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x, y, w, h);
+      ctx.clip();
+      ctx.fillStyle = '#ffd100';
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = '#111111';
+      for (let k = -h; k < w; k += 36) {
+        ctx.beginPath();
+        ctx.moveTo(x + k, y + h);
+        ctx.lineTo(x + k + 18, y + h);
+        ctx.lineTo(x + k + 18 + h, y);
+        ctx.lineTo(x + k + h, y);
+        ctx.fill();
+      }
+      ctx.restore();
+      return;
+    }
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(x, y, w, h);
+    // The house with a flame inside it, in red on the element.
+    ctx.strokeStyle = '#c8102e';
+    ctx.fillStyle = '#c8102e';
+    ctx.lineWidth = 9;
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(78, 108);
+    ctx.lineTo(128, 52);
+    ctx.lineTo(178, 108);
+    ctx.lineTo(178, 132);
+    ctx.lineTo(78, 132);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(128, 72);
+    ctx.bezierCurveTo(152, 92, 150, 122, 128, 126);
+    ctx.bezierCurveTo(106, 122, 104, 94, 128, 72);
+    ctx.fill();
+    ctx.font = '800 30px "Archivo Variable", ui-sans-serif, sans-serif';
+    ctx.fillText('PUSH HERE', size / 2, 184);
+  });
+  // The face comes from the glTF kit, whose UVs run top-down.
+  texture.flipY = false;
+  return m.own(new THREE.MeshBasicMaterial({ map: texture }));
+}
+
+// A green fire exit sign: a running figure heading through a door, an arrow and FIRE EXIT.
+export function exitSign(m: Materials) {
+  const w = 512;
+  const h = 188;
+  const texture = textTexture(m, w, h, (ctx) => {
+    ctx.fillStyle = '#00843d';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#ffffff';
+    ctx.fillStyle = '#ffffff';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    // The door, then the figure running into it.
+    ctx.lineWidth = 8;
+    ctx.strokeRect(150, 28, 74, 132);
+    ctx.beginPath();
+    ctx.arc(102, 46, 13, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 14;
+    ctx.beginPath();
+    ctx.moveTo(96, 66);
+    ctx.lineTo(84, 112);
+    ctx.lineTo(112, 134);
+    ctx.lineTo(118, 160);
+    ctx.moveTo(84, 112);
+    ctx.lineTo(60, 138);
+    ctx.lineTo(40, 140);
+    ctx.moveTo(94, 76);
+    ctx.lineTo(120, 92);
+    ctx.lineTo(140, 80);
+    ctx.moveTo(94, 76);
+    ctx.lineTo(70, 88);
+    ctx.lineTo(56, 108);
+    ctx.stroke();
+    ctx.lineWidth = 12;
+    ctx.beginPath();
+    ctx.moveTo(250, 94);
+    ctx.lineTo(300, 94);
+    ctx.moveTo(284, 76);
+    ctx.lineTo(304, 94);
+    ctx.lineTo(284, 112);
+    ctx.stroke();
+    ctx.font = '800 46px "Archivo Variable", ui-sans-serif, sans-serif';
+    ctx.fillText('FIRE', 400, 70);
+    ctx.fillText('EXIT', 400, 122);
+  });
+  // The face comes from the glTF kit, whose UVs run top-down.
+  texture.flipY = false;
+  return m.own(new THREE.MeshBasicMaterial({ map: texture }));
+}
+
 export function floorName(parent: THREE.Object3D, m: Materials, door: THREE.Vector3, inward: THREE.Vector3, depth: number, across: number, name: string, colour: string) {
   const texture = textTexture(m, 512, 128, (ctx) => {
     ctx.fillStyle = colour;

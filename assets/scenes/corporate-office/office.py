@@ -3,11 +3,21 @@
 #   exec_desk      you sit on +z facing -z
 #   plant          origin at the pot's base
 #   kitchen        12 x 8 m, open to +z, back wall on -z; marker empties: serve, seat, block (w x d)
-#   lift_core      8 x 4 m, lift doors face +z
+#   lift_core      8 x 4 m, openings face +z with lit cars behind; "lift_display" and "call_button" painted by the scene
+#   lift_door      one door leaf, origin at its bottom centre; the scene slides them
+#   stairwell      5.4 x 6.2 m enclosed fire stair, fire door on -z; "exit_sign" painted by the scene; markers block
 #   pod_screen     felt spine along x between two facing desk pairs; "felt" material is tinted per department
 #   sofa           faces +z
 #   low_table      coffee table
 #   ceiling_light  1.2 x 0.6 m, long side on x; origin at the ceiling surface, face down
+#   reception      8.2 x 4 m: angled front counter facing the lifts on -z, "sign_face" name panel on its front, two stations, low credenza on +z; markers seat (the stations), blocks
+#   waiting_room   6 x 6 m of seating, back to the windows on -z, door side +z; markers seat, blocks
+#   conference_room 9 x 7 m furniture: 12-seat table, screen at -x; door side -z, windows +z; markers seat, blocks
+#   meeting_room   5 x 7 m furniture: 6-seat table, screen at +x; markers seat, blocks
+#   call_point     UK manual call point at 1.4 m; origin on the wall at floor height, faces +z; "call_face" painted by the scene
+#   call_post      call point on a short post, for glass walls; faces +z
+#   smoke_detector European combined detector and sounder-beacon; origin at the ceiling surface; "strobe" ring flashed by the scene
+#   sign_pillar    post with a framed sign on top, readable from +z and -z; "sign_face" material takes the department's text
 # Positions are in three.js terms (x right, y up, z toward you); to_blender converts, the glTF export turns them back.
 
 import math
@@ -84,6 +94,16 @@ def screen_material():
 M = {
     "desk_top": material("desk_top", "#ece8e1", 0.45),
     "steel": material("steel", "#2e3136", 0.35, 0.8),
+    "sign_face": material("sign_face", "#ffffff", 0.5),
+    "rug": material("rug", "#6f655c", 1.0),
+    "fire_red": material("fire_red", "#c8102e", 0.45),
+    "strobe": material("strobe", "#f2b8b0", 0.15),
+    "call_face": material("call_face", "#ffffff", 0.5),
+    "lift_display": material("lift_display", "#000000", 0.5),
+    "call_button": material("call_button", "#ffffff", 0.5),
+    "exit_sign": material("exit_sign", "#ffffff", 0.5),
+    "door_grey": material("door_grey", "#8c9095", 0.6),
+    "concrete_step": material("concrete_step", "#b9b4ab", 0.9),
     "alu": material("alu", "#b9bdc2", 0.3, 0.9),
     "bezel": material("bezel", "#16181c", 0.4),
     "screen": screen_material(),
@@ -217,7 +237,7 @@ def task_chair(parent, x, z, back):
     cyl(parent, M["steel"], 0.025, 0.32, x, 0.27, z, verts=12)
     for k in range(5):
         a = k * 2 * math.pi / 5
-        box(parent, M["steel"], 0.3, 0.03, 0.04, x + math.cos(a) * 0.15, 0.07, z + math.sin(a) * 0.15, rot_y=a)
+        box(parent, M["steel"], 0.3, 0.03, 0.04, x + math.cos(a) * 0.15, 0.07, z + math.sin(a) * 0.15, rot_y=-a)
         cyl(parent, M["bezel"], 0.025, 0.04, x + math.cos(a) * 0.3, 0.025, z + math.sin(a) * 0.3, verts=8)
 
 
@@ -265,13 +285,13 @@ def exec_desk():
     cyl(p, M["alu"], 0.03, 0.34, 0, 0.28, 1.2, verts=12)
     for k in range(5):
         a = k * 2 * math.pi / 5
-        box(p, M["alu"], 0.34, 0.03, 0.045, math.cos(a) * 0.17, 0.07, 1.2 + math.sin(a) * 0.17, rot_y=a)
+        box(p, M["alu"], 0.34, 0.03, 0.045, math.cos(a) * 0.17, 0.07, 1.2 + math.sin(a) * 0.17, rot_y=-a)
 
 
 def plant_parts(parent, r, h, leaves):
     """leaves: (dx, dy, dz, radius) each."""
     cyl(parent, M["pot"], r, h, 0, h / 2, 0, r_top=r + 0.03, verts=28)
-    cyl(parent, M["soil"], r + 0.01, 0.02, 0, h - 0.01, 0)
+    cyl(parent, M["soil"], r + 0.01, 0.02, 0, h - 0.004, 0)
     for k, (dx, dy, dz, size) in enumerate(leaves):
         blob(parent, M["leaf" if k % 2 else "leaf_light"], size, dx, dy, dz, squash=0.85)
 
@@ -392,17 +412,124 @@ def kitchen():
         plant_parts(pot, 0.2, 0.38, [(0, 0.75, 0, 0.3), (0.15, 0.6, 0.08, 0.22), (-0.14, 0.62, -0.06, 0.22)])
 
 
+def face_plane(p, mat, w, h, x, y, z, facing):
+    """A flat face w x h centred at x, y, z, looking toward +z (facing 1) or -z (facing -1)."""
+    bpy.ops.mesh.primitive_plane_add(size=1)
+    board = bpy.context.active_object
+    board.name = f"{p.name}_{mat.name}"
+    board.scale = (w, h, 1)
+    bpy.ops.object.transform_apply(scale=True)
+    board.data.materials.append(mat)
+    place(board, p, x, y, z)
+    board.rotation_euler = (math.radians(90), 0, 0 if facing > 0 else math.pi)
+    return board
+
+
 def lift_core():
+    """Two lifts, doors facing +z. The front wall has an opening per lift with a lit car behind it;
+    the door leaves are a separate piece (lift_door) the scene slides into the wall. Each lift has a
+    "lift_display" over its doors that the scene paints, and the call panel between them is
+    "call_button"."""
     p = piece("lift_core")
-    box(p, M["core_wall"], 8, 3.3, 4, 0, 1.65, 0, round_=0.02)
+    h = 3.3
+    # Back, sides, middle partition and roof.
+    box(p, M["core_wall"], 8, h, 0.2, 0, h / 2, -1.9, round_=0.01)
+    for x in (-3.9, 0, 3.9):
+        box(p, M["core_wall"], 0.2, h, 4, x, h / 2, 0, round_=0.01)
+    box(p, M["core_wall"], 8, 0.1, 4, 0, h - 0.05, 0, round_=0.01)
+    # Front wall in pieces round the two openings (1.2 x 2.25 at x = -1.6 and 1.6).
+    for x0, x1 in ((-4, -2.2), (-1.0, 1.0), (2.2, 4)):
+        box(p, M["core_wall"], x1 - x0, h, 0.2, (x0 + x1) / 2, h / 2, 1.9, round_=0.01)
     for x in (-1.6, 1.6):
-        box(p, M["steel"], 1.5, 2.45, 0.06, x, 1.225, 2.0, round_=0.005)
-        box(p, M["lift_door"], 0.6, 2.25, 0.03, x - 0.305, 1.125, 2.04, round_=0.002)
-        box(p, M["lift_door"], 0.6, 2.25, 0.03, x + 0.305, 1.125, 2.04, round_=0.002)
-        box(p, M["bezel"], 0.4, 0.08, 0.02, x, 2.55, 2.03, round_=0)
-        box(p, M["green_light"], 0.12, 0.03, 0.01, x, 2.55, 2.045, round_=0)
-    box(p, M["alu"], 0.08, 0.2, 0.02, 0, 1.15, 2.02, round_=0.005)
-    box(p, M["bezel"], 1.0, 0.6, 0.02, 0, 1.75, 2.02, round_=0.005)
+        box(p, M["core_wall"], 1.2, h - 2.25, 0.2, x, 2.25 + (h - 2.25) / 2, 1.9, round_=0)
+        # Steel frame round the opening.
+        for side in (-1, 1):
+            box(p, M["steel"], 0.08, 2.33, 0.26, x + side * 0.635, 1.165, 1.92, round_=0.004)
+        box(p, M["steel"], 1.35, 0.08, 0.26, x, 2.285, 1.92, round_=0.004)
+        box(p, M["steel"], 1.2, 0.02, 0.3, x, 0.01, 1.9, round_=0)
+        # The car: brushed steel walls, a mirror at the back, a lit ceiling and a handrail.
+        box(p, M["stone_dark"], 1.6, 0.02, 1.9, x, 0.01, 0.8, round_=0)
+        box(p, M["alu"], 1.6, 2.4, 0.03, x, 1.2, -0.17, round_=0)
+        box(p, M["glass_dark"], 1.0, 1.4, 0.01, x, 1.35, -0.15, round_=0)
+        for side in (-1, 1):
+            box(p, M["alu"], 0.03, 2.4, 1.89, x + side * 0.8, 1.2, 0.795, round_=0)
+            box(p, M["steel"], 0.03, 0.03, 1.4, x + side * 0.76, 0.95, 0.7, round_=0.006)
+        box(p, M["alu"], 1.6, 0.03, 1.9, x, 2.415, 0.8, round_=0)
+        box(p, M["diffuser"], 1.3, 0.01, 1.5, x, 2.395, 0.8, round_=0)
+        box(p, M["bezel"], 0.42, 0.14, 0.02, x, 2.55, 2.01, round_=0.004)
+        face_plane(p, M["lift_display"], 0.38, 0.11, x, 2.55, 2.022, 1)
+    # Call panel between the lifts, and a floor directory screen above it.
+    box(p, M["alu"], 0.12, 0.26, 0.02, 0, 1.15, 2.01, round_=0.006)
+    face_plane(p, M["call_button"], 0.07, 0.2, 0, 1.15, 2.022, 1)
+    box(p, M["bezel"], 1.0, 0.6, 0.02, 0, 1.75, 2.01, round_=0.005)
+
+
+def lift_door():
+    """One leaf of a lift door, origin at the bottom centre."""
+    p = piece("lift_door")
+    box(p, M["lift_door"], 0.68, 2.33, 0.04, 0, 1.165, 0, round_=0.003)
+    box(p, M["steel"], 0.01, 2.33, 0.044, 0.34, 1.165, 0, round_=0)
+
+
+def fire_door():
+    """The stairwell's door leaf, origin on its hinge at the stair-side face. It swings into the stair
+    (toward +z) when rotated by a negative angle. Push bar on the floor side, closer on the stair side."""
+    p = piece("fire_door")
+    box(p, M["door_grey"], 0.96, 2.06, 0.05, 0.48, 1.04, -0.025, round_=0.004)
+    box(p, M["glass_dark"], 0.16, 0.7, 0.052, 0.23, 1.45, -0.025, round_=0)
+    box(p, M["steel"], 0.7, 0.04, 0.05, 0.5, 1.0, -0.085, round_=0.01)
+    for x in (0.18, 0.82):
+        box(p, M["steel"], 0.04, 0.08, 0.06, x, 1.0, -0.08, round_=0.006)
+    box(p, M["steel"], 0.36, 0.06, 0.06, 0.25, 1.95, 0.03, round_=0.008)
+
+
+def stairwell():
+    """An enclosed fire stair, 5.4 x 6.2 m, walls to the ceiling, one fire door on -z near its -x end.
+    Inside, two flights rise round a landing to the floor above. The green "exit_sign" over the door is
+    painted by the scene. Markers block the walls."""
+    p = piece("stairwell")
+    w, d, h, t = 5.4, 6.2, 3.3, 0.2
+    door_x = -w / 2 + 1.0
+    box(p, M["core_wall"], w, h, t, 0, h / 2, d / 2 - t / 2, round_=0.01)
+    for side in (-1, 1):
+        box(p, M["core_wall"], t, h, d, side * (w / 2 - t / 2), h / 2, 0, round_=0.01)
+    # Front wall round the door opening (1.0 x 2.1).
+    fz = -d / 2 + t / 2
+    left, right = door_x - 0.5, door_x + 0.5
+    box(p, M["core_wall"], left + w / 2, h, t, (-w / 2 + left) / 2, h / 2, fz, round_=0.01)
+    box(p, M["core_wall"], w / 2 - right, h, t, (right + w / 2) / 2, h / 2, fz, round_=0.01)
+    box(p, M["core_wall"], 1.0, h - 2.1, t, door_x, 2.1 + (h - 2.1) / 2, fz, round_=0)
+    # The door frame; the leaf is its own piece (fire_door) so the scene can swing it.
+    for side in (-1, 1):
+        box(p, M["steel"], 0.06, 2.16, 0.24, door_x + side * 0.52, 1.08, fz, round_=0.004)
+    box(p, M["steel"], 1.1, 0.06, 0.24, door_x, 2.12, fz, round_=0.004)
+    face_plane(p, M["exit_sign"], 0.6, 0.22, door_x, 2.35, fz - 0.142, -1)
+    box(p, M["bezel"], 0.64, 0.26, 0.04, door_x, 2.35, fz - 0.12, round_=0.006)
+    # Two flights round a landing at the back: up along +x from the front, back down... toward the front
+    # rising on the -x side. Eleven steps each, 0.15 high.
+    inner_w = w - 2 * t
+    flight_w = inner_w / 2 - 0.1
+    rise, run, steps = 0.15, 0.28, 11
+    start = -d / 2 + t + 1.4
+    for k in range(steps):
+        y = (k + 1) * rise
+        box(p, M["concrete_step"], flight_w, y, run, inner_w / 4 + 0.05, y / 2, start + k * run + run / 2, round_=0)
+    landing_z = start + steps * run
+    landing_d = d / 2 - t - landing_z
+    box(p, M["concrete_step"], inner_w, steps * rise, landing_d, 0, steps * rise / 2, landing_z + landing_d / 2, round_=0)
+    for k in range(steps):
+        y = steps * rise + (k + 1) * rise
+        box(p, M["concrete_step"], flight_w, 0.15, run, -inner_w / 4 - 0.05, y - 0.075, landing_z - (k + 1) * run + run / 2, round_=0)
+    # A wall between the flights and handrails on it.
+    box(p, M["core_wall"], 0.1, 3.0, steps * run, 0, 1.5, start + steps * run / 2, round_=0)
+    for side in (-1, 1):
+        box(p, M["steel"], 0.04, 0.04, steps * run, side * 0.09, 1.0 + (0 if side > 0 else steps * rise), start + steps * run / 2, round_=0.01)
+    marker(p, "block", 0, d / 2 - t / 2, w=w, d=t)
+    for side in (-1, 1):
+        marker(p, "block", side * (w / 2 - t / 2), 0, w=t, d=d)
+    marker(p, "block", (-w / 2 + left) / 2, fz, w=left + w / 2, d=t)
+    marker(p, "block", (right + w / 2) / 2, fz, w=w / 2 - right, d=t)
+    marker(p, "block", door_x, fz, w=1.0, d=0.3)
 
 
 def merge():
@@ -461,6 +588,224 @@ def pod_screen():
             box(p, M["steel"], 0.06, 0.04, 0.06, side * 1.66, 0.02, z, round_=0.005)
 
 
+def sign_pillar():
+    p = piece("sign_pillar")
+    box(p, M["steel"], 0.36, 0.03, 0.36, 0, 0.015, 0, round_=0.008)
+    # The post stops under the sign: it is thicker than the sign, so it would show through both faces.
+    box(p, M["steel"], 0.1, 1.94, 0.1, 0, 0.97, 0, round_=0.01)
+    box(p, M["steel"], 0.5, 0.04, 0.07, 0, 1.96, 0, round_=0.008)
+    box(p, M["bezel"], 1.84, 0.64, 0.08, 0, 2.3, 0, round_=0.015)
+    # One face each side, each turned so its text reads the right way round from that side.
+    for face in (1, -1):
+        bpy.ops.mesh.primitive_plane_add(size=1)
+        board = bpy.context.active_object
+        board.name = f"sign_pillar_face_{'front' if face > 0 else 'back'}"
+        board.scale = (1.76, 0.56, 1)
+        bpy.ops.object.transform_apply(scale=True)
+        board.data.materials.append(M["sign_face"])
+        place(board, p, 0, 2.3, face * 0.0415)
+        board.rotation_euler = (math.radians(90), 0, 0 if face > 0 else math.pi)
+
+
+def small_plant(parent, name, x, z):
+    pot = piece(name)
+    pot.parent = parent
+    pot.location = to_blender(x, 0, z)
+    plant_parts(pot, 0.2, 0.38, [(0, 0.75, 0, 0.3), (0.15, 0.6, 0.08, 0.22), (-0.14, 0.62, -0.06, 0.22)])
+
+
+def reception():
+    p = piece("reception")
+    # A stone floor marks the area. Visitors come from the lifts on -z.
+    box(p, M["tile"], 8.2, 0.012, 4.0, 0, 0.008, 1.3, round_=0)
+    # One continuous counter on an arc bowing toward the lifts: short segments, each overlapping the next.
+    radius, spread, count = 6.0, math.radians(38), 14
+    centre = radius
+
+    def on_arc(r, angle):
+        return r * math.sin(angle), centre - r * math.cos(angle)
+
+    step = 2 * spread / count
+    for k in range(count):
+        angle = -spread + (k + 0.5) * step
+        for r, w, h, d, y, mat in (
+            (radius + 0.06, 1.0, 1.05, 0.12, 0.525, "walnut"),
+            (radius - 0.02, 1.0, 0.04, 0.36, 1.07, "stone_dark"),
+            (radius - 0.42, 1.0, 0.04, 0.72, 0.74, "desk_top"),
+        ):
+            x, z = on_arc(r, angle)
+            box(p, M[mat], 2 * r * math.sin(step / 2) * w * 1.04, h, d, x, y, z, rot_y=-angle, round_=0.005)
+    for side in (-1, 1):
+        x, z = on_arc(radius - 0.2, side * spread)
+        box(p, M["walnut"], 0.1, 1.05, 0.9, x, 0.525, z, rot_y=-side * spread, round_=0.01)
+    # The name panel, bent to the counter's curve so it sits flush; its UVs survive the bend.
+    bpy.ops.mesh.primitive_plane_add(size=1)
+    board = bpy.context.active_object
+    board.name = "reception_face"
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.subdivide(number_cuts=15)
+    bpy.ops.object.mode_set(mode="OBJECT")
+    # The counter's outer face is at radius + 0.12; the panel stands just proud of it.
+    panel_w, panel_h, face_r = 2.6, 0.42, radius + 0.14
+    # Seen from the lifts (looking +z), +x is on the left, so the text runs toward -x.
+    for v in board.data.vertices:
+        u, h = -v.co.x * panel_w, v.co.y * panel_h
+        angle = u / face_r
+        v.co.x, v.co.y, v.co.z = face_r * math.sin(angle), -(centre - face_r * math.cos(angle)), h
+    board.data.materials.append(M["sign_face"])
+    place(board, p, 0, 0.62, 0)
+    board.rotation_euler = (0, 0, 0)
+    # The app draws one side only: the face must point at the lifts (three -z, Blender +y).
+    board.data.update()
+    if board.data.polygons[len(board.data.polygons) // 2].normal.y < 0:
+        board.data.flip_normals()
+    # Two stations behind it.
+    for x in (-1.3, 1.3):
+        cz = centre - math.sqrt(radius**2 - x**2)
+        monitor(p, x, cz + 0.35, 1)
+        box(p, M["keys"], 0.44, 0.02, 0.14, x, 0.77, cz + 0.62, round_=0.005)
+        task_chair(p, x, cz + 1.3, 1)
+        marker(p, "seat", x, cz + 1.3, math.pi)
+    cyl(p, M["brass"], 0.05, 0.03, -2.4, 1.105, 0.5)
+    cyl(p, M["brass"], 0.035, 0.03, -2.4, 1.13, 0.5)
+    # A low credenza behind the stations and one plant at the end.
+    box(p, M["walnut"], 5.0, 0.9, 0.5, 0, 0.45, 2.6, round_=0.02)
+    box(p, M["stone_dark"], 5.1, 0.03, 0.54, 0, 0.915, 2.6, round_=0.01)
+    box(p, M["bezel"], 0.45, 0.25, 0.35, 1.6, 1.055, 2.6, round_=0.02)
+    small_plant(p, "reception_plant", -4.3, 2.2)
+    marker(p, "block", 0, 0.3, w=4.6, d=0.9)
+    for side in (-1, 1):
+        marker(p, "block", side * 3.0, 1.0, w=1.6, d=1.0)
+    marker(p, "block", 0, 2.6, w=5.1, d=0.6)
+
+
+def armchair(p, x, z, facing):
+    """facing: +1 looks toward +z."""
+    back = -facing
+    box(p, M["upholstery"], 0.8, 0.42, 0.78, x, 0.21, z, round_=0.06)
+    box(p, M["upholstery"], 0.8, 0.45, 0.18, x, 0.62, z + back * 0.3, round_=0.05)
+    for side in (-1, 1):
+        box(p, M["upholstery"], 0.14, 0.58, 0.78, x + side * 0.33, 0.29, z, round_=0.04)
+    marker(p, "seat", x, z, 0.0 if facing > 0 else math.pi)
+
+
+def waiting_room():
+    p = piece("waiting_room")
+    box(p, M["rug"], 4.4, 0.01, 3.4, 0, 0.012, -0.4, round_=0)
+    # A sofa with its back to the windows, two armchairs facing it across a low table.
+    box(p, M["upholstery"], 2.2, 0.42, 0.85, 0, 0.21, -2.2, round_=0.06)
+    box(p, M["upholstery"], 2.2, 0.48, 0.22, 0, 0.62, -2.52, round_=0.06)
+    for side in (-1, 1):
+        box(p, M["upholstery"], 0.22, 0.62, 0.85, side * 1.0, 0.31, -2.2, round_=0.05)
+    for x in (-0.68, 0, 0.68):
+        box(p, M["upholstery"], 0.62, 0.1, 0.6, x, 0.47, -2.14, round_=0.04)
+        marker(p, "seat", x, -2.1, 0.0)
+    for x in (-0.8, 0.8):
+        armchair(p, x, 0.6, -1)
+    box(p, M["walnut"], 1.2, 0.04, 0.6, 0, 0.4, -0.8, round_=0.01)
+    for sx in (-0.52, 0.52):
+        for sz in (-0.24, 0.24):
+            box(p, M["steel"], 0.04, 0.38, 0.04, sx, 0.19, -0.8 + sz, round_=0.005)
+    for k, (dx, colour) in enumerate(((-0.3, "chalk"), (0.05, "red"), (0.3, "ceramic"))):
+        box(p, M[colour], 0.22, 0.012, 0.3, dx, 0.426 + k * 0.004, -0.8, rot_y=0.2 * (k - 1), round_=0)
+    # A water cooler and plants in the corners.
+    box(p, M["ceramic"], 0.34, 1.0, 0.34, 2.5, 0.5, -2.5, round_=0.03)
+    cyl(p, M["glass_dark"], 0.15, 0.42, 2.5, 1.22, -2.5)
+    small_plant(p, "waiting_plant_l", -2.5, -2.5)
+    small_plant(p, "waiting_plant_r", 2.5, 1.9)
+    marker(p, "block", 0, -2.25, w=2.4, d=0.9)
+    marker(p, "block", 0, -0.8, w=1.3, d=0.7)
+    for x in (-0.8, 0.8):
+        marker(p, "block", x, 0.6, w=0.85, d=0.85)
+
+
+def meeting_table(p, length, x, z, chairs):
+    box(p, M["walnut"], length, 0.05, 1.4, x, 0.74, z, round_=0.02)
+    for sx in (-1, 1):
+        box(p, M["steel"], 0.12, 0.7, 0.9, x + sx * (length / 2 - 0.5), 0.36, z, round_=0.01)
+    pitch = length / chairs
+    for k in range(chairs):
+        cx = x - length / 2 + pitch * (k + 0.5)
+        for side in (-1, 1):
+            task_chair(p, cx, z + side * 1.05, side)
+            marker(p, "seat", cx, z + side * 1.05, math.pi if side > 0 else 0.0)
+    marker(p, "block", x, z, w=length + 0.2, d=1.5)
+
+
+def screen_stand(p, x, z, facing_x, width=1.9):
+    """A wall-sized display on a floor stand, its screen toward +x when facing_x is 1."""
+    rot = -facing_x * math.pi / 2
+    box(p, M["steel"], 0.9, 0.04, 0.5, x, 0.02, z, rot_y=rot, round_=0.01)
+    box(p, M["steel"], 0.08, 1.4, 0.08, x, 0.72, z, round_=0.01)
+    box(p, M["bezel"], 0.06, width * 0.58, width, x + facing_x * 0.06, 1.45, z, round_=0.01)
+    box(p, M["screen"], 0.01, width * 0.54, width - 0.08, x + facing_x * 0.095, 1.45, z, round_=0)
+    marker(p, "block", x, z, w=0.6, d=width)
+
+
+def conference_room():
+    p = piece("conference_room")
+    box(p, M["rug"], 7.6, 0.01, 4.6, 0, 0.012, -0.2, round_=0)
+    meeting_table(p, 5.2, 0.3, -0.2, 6)
+    screen_stand(p, -3.9, -0.2, 1, width=2.4)
+    box(p, M["walnut"], 3.0, 0.75, 0.45, 1.0, 0.375, 3.0, round_=0.02)
+    box(p, M["stone_dark"], 3.1, 0.03, 0.49, 1.0, 0.765, 3.0, round_=0.01)
+    for k in range(3):
+        cyl(p, M["cup"], 0.04, 0.1, 0.4 + k * 0.25, 0.83, 3.0, r_top=0.05)
+    cyl(p, M["alu"], 0.08, 0.28, -0.3, 0.92, 3.0, r_top=0.06)
+    marker(p, "block", 1.0, 3.0, w=3.1, d=0.5)
+
+
+def meeting_room():
+    p = piece("meeting_room")
+    box(p, M["rug"], 4.0, 0.01, 4.0, 0, 0.012, 0.0, round_=0)
+    meeting_table(p, 2.4, -0.3, 0.0, 3)
+    screen_stand(p, 1.95, 0.0, -1, width=1.6)
+
+
+def call_unit(p, x, y, z):
+    """A UK manual call point centred at x, y with its back on z: red housing on a back box, its front
+    a "call_face" the scene paints. Clicked in the app to raise the alarm."""
+    box(p, M["fire_red"], 0.095, 0.095, 0.022, x, y, z + 0.011, round_=0.008)
+    box(p, M["fire_red"], 0.089, 0.089, 0.024, x, y, z + 0.034, round_=0.012)
+    box(p, M["ceramic"], 0.074, 0.074, 0.006, x, y, z + 0.0475, round_=0.004)
+    bpy.ops.mesh.primitive_plane_add(size=1)
+    face = bpy.context.active_object
+    face.name = f"{p.name}_face"
+    face.scale = (0.07, 0.07, 1)
+    bpy.ops.object.transform_apply(scale=True)
+    face.data.materials.append(M["call_face"])
+    place(face, p, x, y, z + 0.051)
+    face.rotation_euler = (math.radians(90), 0, 0)
+
+
+def call_point():
+    p = piece("call_point")
+    call_unit(p, 0, 1.4, 0)
+
+
+def call_post():
+    """A short post for a call point where the wall is glass."""
+    p = piece("call_post")
+    box(p, M["steel"], 0.24, 0.02, 0.24, 0, 0.01, 0, round_=0.006)
+    box(p, M["steel"], 0.07, 1.52, 0.07, 0, 0.77, 0, round_=0.01)
+    box(p, M["steel"], 0.09, 0.02, 0.09, 0, 1.54, 0, round_=0.005)
+    call_unit(p, 0, 1.4, 0.035)
+
+
+def smoke_detector():
+    """A European combined unit: sounder-beacon base (grille and a red lens ring the scene flashes
+    during an alarm) with the smoke detector head fitted underneath. Origin at the ceiling surface."""
+    p = piece("smoke_detector")
+    cyl(p, M["trim"], 0.08, 0.02, 0, -0.01, 0, verts=32)
+    for k in range(16):
+        a = k * 2 * math.pi / 16
+        box(p, M["chalk"], 0.012, 0.012, 0.003, math.cos(a) * 0.081, -0.01, math.sin(a) * 0.081, rot_y=-a + math.pi / 2, round_=0)
+    cyl(p, M["strobe"], 0.072, 0.012, 0, -0.026, 0, verts=32)
+    cyl(p, M["ceramic"], 0.055, 0.03, 0, -0.047, 0, verts=32, r_top=0.06)
+    cyl(p, M["trim"], 0.04, 0.008, 0, -0.066, 0, verts=24)
+    box(p, M["red"], 0.008, 0.004, 0.008, 0.035, -0.064, 0, round_=0)
+
+
 def sofa():
     p = piece("sofa")
     box(p, M["upholstery"], 2.2, 0.42, 0.85, 0, 0.21, 0, round_=0.06)
@@ -484,8 +829,19 @@ exec_desk()
 plant()
 kitchen()
 lift_core()
+lift_door()
+stairwell()
+fire_door()
 ceiling_light()
 pod_screen()
+sign_pillar()
+reception()
+waiting_room()
+conference_room()
+meeting_room()
+call_point()
+call_post()
+smoke_detector()
 sofa()
 low_table()
 merge()
