@@ -2,10 +2,7 @@ name: Build
 
 on:
   push:
-    branches: [main]
     tags: ['v*']
-  pull_request:
-  workflow_dispatch:
 
 concurrency:
   group: build-${{ github.ref }}
@@ -15,6 +12,8 @@ jobs:
   macos:
     runs-on: macos-latest
     timeout-minutes: 30
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -39,7 +38,6 @@ jobs:
           pnpm --dir frontend install --frozen-lockfile
 
       - name: Set version from tag
-        if: startsWith(github.ref, 'refs/tags/v')
         run: |
           jq --arg v "${GITHUB_REF_NAME#v}" '.info.productVersion = $v' wails.json > wails.json.tmp
           mv wails.json.tmp wails.json
@@ -53,10 +51,8 @@ jobs:
       - name: Package
         run: |
           app=$(ls -d build/bin/*.app | head -1)
-          label=${GITHUB_SHA::7}
-          [[ "$GITHUB_REF" == refs/tags/v* ]] && label=$GITHUB_REF_NAME
           mkdir dist
-          ditto -c -k --keepParent "$app" "dist/Trellis-macos-$label.zip"
+          ditto -c -k --keepParent "$app" "dist/Trellis-macos-$GITHUB_REF_NAME.zip"
           cat > dist/README.txt <<'TXT'
           Trellis beta build (unsigned).
 
@@ -68,30 +64,11 @@ jobs:
           Needs Claude Code (run claude once to log in), git and gh installed.
           TXT
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: trellis-macos-${{ github.sha }}
-          path: dist/
-          retention-days: 30
-
-  release:
-    if: startsWith(github.ref, 'refs/tags/v')
-    needs: macos
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: trellis-macos-${{ github.sha }}
-          path: dist
-
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release create "$GITHUB_REF_NAME" dist/* \
-            --repo "$GITHUB_REPOSITORY" \
             --title "Trellis $GITHUB_REF_NAME" \
             --generate-notes \
             --prerelease \
