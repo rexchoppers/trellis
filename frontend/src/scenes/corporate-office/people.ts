@@ -14,6 +14,7 @@ export type Person = {
   colour: string;
   seat: THREE.Vector3;
   facing: number;
+  desk: Desk;
   out: THREE.Vector3[];
   place: 'desk' | 'human';
   queue: number;
@@ -24,7 +25,7 @@ export function route(person: Person) {
   return [...person.out, new THREE.Vector3(0, 0, -OFFICE.hz - 0.9), new THREE.Vector3(0, 0, -OFFICE.hz + 1.1), front];
 }
 
-const sitAt = (desk: Desk) => ({ seat: desk.seat, facing: Math.atan2(desk.inward.x, desk.inward.z), out: desk.out });
+const sitAt = (desk: Desk) => ({ seat: desk.seat, facing: Math.atan2(desk.inward.x, desk.inward.z), out: desk.out, desk });
 
 export function people(plan: Plan, list: jobs.Job[]): Person[] {
   // Agents resting between checks sit at their desks too.

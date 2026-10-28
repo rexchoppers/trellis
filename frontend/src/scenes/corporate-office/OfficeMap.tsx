@@ -13,6 +13,7 @@ import { buildFloor, fitSun, type Floor } from './floor';
 import { npcCrowd } from './npcs';
 import { people, type AgentHit } from './people';
 import { agentFigures } from './walkers';
+import { nameplates } from './nameplates';
 import { buildWorld, SKY } from './world';
 
 export type { AgentHit, View };
@@ -96,6 +97,7 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
       handlers.current.onAgent(hit, { x: e.clientX - rect.left, y: e.clientY - rect.top });
     };
     const walkers = agentFigures(world.scene, element, open);
+    const plates = nameplates(world.scene);
     const npcs = npcCrowd(world.scene, element, () => floor, walkers.namesNear);
 
     const frame = (now: number) => {
@@ -221,7 +223,10 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
     };
     const onMove = (e: PointerEvent) => {
       if (!drag) {
-        canvas.style.cursor = pick(e) || callPointAt(e) >= 0 || panelResetAt(e) || liftButtonAt(e) || stairDoorAt(e) || serverAt(e) || fittingAt(e) ? 'pointer' : '';
+        const hit = pick(e);
+        walkers.hover(hit);
+        npcs.hover(hit || !floor ? null : ray);
+        canvas.style.cursor = hit || callPointAt(e) >= 0 || panelResetAt(e) || liftButtonAt(e) || stairDoorAt(e) || serverAt(e) || fittingAt(e) ? 'pointer' : '';
         return;
       }
       const dx = e.clientX - drag.x;
@@ -256,6 +261,10 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
       e.preventDefault();
       rig.zoom(e.deltaY);
     };
+    const onLeave = () => {
+      walkers.hover(undefined);
+      npcs.hover(null);
+    };
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.code === 'KeyH' && !typing(e.target)) walkers.toggleHits();
       else if (e.code === 'KeyN' && !typing(e.target)) setNoclip(rig.toggleNoclip());
@@ -263,6 +272,7 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
     };
     canvas.addEventListener('pointerdown', onDown);
     canvas.addEventListener('pointermove', onMove);
+    canvas.addEventListener('pointerleave', onLeave);
     canvas.addEventListener('pointerup', onUp);
     canvas.addEventListener('pointercancel', onCancel);
     canvas.addEventListener('wheel', onWheel, { passive: false });
@@ -278,13 +288,20 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
         running = next;
         floor?.servers.show(next);
         floor?.townHall.show(next);
-        if (floor) walkers.set(people(floor.plan, next));
+        if (!floor) return;
+        const crowd = people(floor.plan, next);
+        walkers.set(crowd);
+        plates.set(crowd);
       },
     };
     setDepartments(latest.current);
     // Signs are painted on canvases; repaint them once their font has loaded.
     let alive = true;
-    document.fonts?.load('700 64px "Archivo Variable"').then(() => alive && setDepartments(latest.current));
+    document.fonts?.load('700 64px "Archivo Variable"').then(() => {
+      if (!alive) return;
+      setDepartments(latest.current);
+      plates.repaint();
+    });
     raf = requestAnimationFrame(frame);
 
     return () => {
@@ -293,6 +310,7 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
       observer.disconnect();
       canvas.removeEventListener('pointerdown', onDown);
       canvas.removeEventListener('pointermove', onMove);
+      canvas.removeEventListener('pointerleave', onLeave);
       canvas.removeEventListener('pointerup', onUp);
       canvas.removeEventListener('pointercancel', onCancel);
       canvas.removeEventListener('wheel', onWheel);
@@ -301,6 +319,7 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
       window.removeEventListener('blur', rig.stop);
       controls.current = null;
       walkers.dispose();
+      plates.dispose();
       npcs.dispose();
       floor?.dispose();
       alarm.dispose();

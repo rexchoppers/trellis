@@ -21,6 +21,7 @@ type Npc = {
 export function npcCrowd(scene: THREE.Scene, host: HTMLElement, floor: () => Floor | null, namesNear: (here: THREE.Vector3, within: number) => string[]) {
   let npcs: Npc[] = [];
   const at = new THREE.Vector3();
+  let hovered: Npc | undefined;
 
   const drop = () => {
     for (const npc of npcs) {
@@ -122,15 +123,23 @@ export function npcCrowd(scene: THREE.Scene, host: HTMLElement, floor: () => Flo
     for (const npc of npcs) {
       const feet = toScreen(at.copy(npc.figure.position).setY(0), camera, width, height);
       const visible = npc.figure.visible && feet.visible;
-      show(npc.tag, visible);
+      show(npc.tag, visible && npc === hovered);
       const talking = visible && now < npc.sayUntil && npc.line !== '';
       show(npc.bubble, talking);
-      if (visible) placeTag(npc.tag, feet);
+      if (visible && npc === hovered) placeTag(npc.tag, feet);
       if (!talking) continue;
       placeBubble(npc.bubble, toScreen(at.copy(npc.figure.position).setY(npc.def.does === 'sit' ? 1.5 : 1.9), camera, width, height));
       setBubble(npc.bubble, npc.line, true);
     }
   };
 
-  return { place, move, label, dispose: drop };
+  // Whoever is under the pointer gets their name shown.
+  const hover = (ray: THREE.Raycaster | null) => {
+    const shown = npcs.filter((npc) => npc.figure.visible);
+    const hit = ray?.intersectObjects(shown.map((npc) => npc.figure), true)[0];
+    hovered = undefined;
+    for (let object: THREE.Object3D | null = hit?.object ?? null; object && !hovered; object = object.parent) hovered = shown.find((npc) => npc.figure === object);
+  };
+
+  return { place, move, label, hover, dispose: drop };
 }

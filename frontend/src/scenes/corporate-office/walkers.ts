@@ -16,6 +16,8 @@ export function agentFigures(scene: THREE.Scene, host: HTMLElement, onClick: (hi
   const at = new THREE.Vector3();
   // Debug: H toggles yellow outlines of the click boxes.
   let showHits = false;
+  // Names show only for whoever is under the pointer; desks carry the rest.
+  let hovered: AgentHit | undefined;
 
   // stopPropagation so a click on a tag never falls through to whoever stands behind it.
   const open = (id: string, e: MouseEvent) => {
@@ -99,8 +101,9 @@ export function agentFigures(scene: THREE.Scene, host: HTMLElement, onClick: (hi
       }
       if (tag.textContent !== walker.person.name) tag.textContent = walker.person.name;
       const feet = toScreen(at.copy(walker.figure.position).setY(0), camera, width, height);
-      show(tag, feet.visible);
-      if (feet.visible) placeTag(tag, feet);
+      const named = feet.visible && walker.person.hit === hovered;
+      show(tag, named);
+      if (named) placeTag(tag, feet);
 
       let bubble = bubbles.get(id);
       if (!bubble) {
@@ -154,6 +157,9 @@ export function agentFigures(scene: THREE.Scene, host: HTMLElement, onClick: (hi
     update,
     label,
     pick,
+    hover: (hit: AgentHit | undefined) => {
+      hovered = hit;
+    },
     namesNear,
     toggleHits: () => {
       showHits = !showHits;
