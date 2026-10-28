@@ -96,8 +96,8 @@ export function cameraRig(camera: THREE.PerspectiveCamera, view: () => View, obs
   };
 
   return {
-    frame: ({ zones, places }: Plan) => {
-      const xs = [-6, 6, ...zones.flatMap((zone) => [zone.x0, zone.x1]), ...places.flatMap((p) => [p.centre.x - p.w / 2, p.centre.x + p.w / 2])];
+    frame: ({ zones, places, townHall }: Plan) => {
+      const xs = [-6, 6, ...zones.flatMap((zone) => [zone.x0, zone.x1]), ...places.flatMap((p) => [p.centre.x - p.w / 2, p.centre.x + p.w / 2]), townHall.centre.x + townHall.w / 2];
       const zs = [4, ...zones.flatMap((zone) => [zone.z0, zone.z1]), ...places.flatMap((p) => [p.centre.z - p.d / 2, p.centre.z + p.d / 2])];
       const [x0, x1, z0, z1] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)];
       frameSpan = Math.max(x1 - x0, z1 - z0) * 1.05;

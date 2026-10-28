@@ -4,7 +4,7 @@ export const STOREY = 3.3;
 
 export type Obstacle = { x: number; z: number; hx: number; hz: number };
 
-type Materials = {
+export type Materials = {
   mat: (colour: number) => THREE.Material;
   pane: () => THREE.Material;
   frost: () => THREE.Material;
@@ -274,6 +274,191 @@ export function exitSign(m: Materials) {
     ctx.font = '800 46px "Archivo Variable", ui-sans-serif, sans-serif';
     ctx.fillText('FIRE', 400, 70);
     ctx.fillText('EXIT', 400, 122);
+  });
+  // The face comes from the glTF kit, whose UVs run top-down.
+  texture.flipY = false;
+  return m.own(new THREE.MeshBasicMaterial({ map: texture }));
+}
+
+// A UK door sign in white on blue: a toilet pictogram over its name, or a plant or server room's warning.
+export function doorSign(m: Materials, kind: 'ladies' | 'gents' | 'accessible' | 'plant' | 'server') {
+  const w = 352;
+  const h = 448;
+  const texture = textTexture(m, w, h, (ctx) => {
+    ctx.fillStyle = '#1d4f91';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    const round = (x: number, y: number, rw: number, rh: number, r: number) => {
+      ctx.beginPath();
+      ctx.roundRect(x, y, rw, rh, r);
+      ctx.fill();
+    };
+    if (kind === 'plant' || kind === 'server') {
+      ctx.font = '800 64px "Archivo Variable", ui-sans-serif, sans-serif';
+      ctx.fillText(kind === 'plant' ? 'PLANT' : 'SERVER', w / 2, 120);
+      ctx.fillText('ROOM', w / 2, 196);
+      ctx.font = '600 30px "Archivo Variable", ui-sans-serif, sans-serif';
+      ctx.fillText('Authorised', w / 2, 300);
+      ctx.fillText('persons only', w / 2, 340);
+      return;
+    }
+    if (kind === 'accessible') {
+      // The International Symbol of Access: a seated figure inside a wheel open at the top right.
+      ctx.beginPath();
+      ctx.arc(146, 64, 26, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 22;
+      ctx.beginPath();
+      ctx.moveTo(146, 110);
+      ctx.lineTo(146, 196);
+      ctx.lineTo(216, 196);
+      ctx.lineTo(240, 282);
+      ctx.moveTo(146, 140);
+      ctx.lineTo(200, 140);
+      ctx.stroke();
+      ctx.lineWidth = 18;
+      ctx.beginPath();
+      ctx.arc(150, 236, 70, 0.12 * Math.PI, 1.62 * Math.PI);
+      ctx.stroke();
+    } else {
+      ctx.beginPath();
+      ctx.arc(176, 74, 30, 0, Math.PI * 2);
+      ctx.fill();
+      round(108, 120, 22, 96, 11);
+      round(222, 120, 22, 96, 11);
+      if (kind === 'gents') {
+        round(138, 116, 76, 112, 14);
+        round(140, 222, 32, 100, 12);
+        round(180, 222, 32, 100, 12);
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(144, 116);
+        ctx.lineTo(208, 116);
+        ctx.lineTo(240, 262);
+        ctx.lineTo(112, 262);
+        ctx.closePath();
+        ctx.fill();
+        round(146, 256, 26, 66, 10);
+        round(180, 256, 26, 66, 10);
+      }
+    }
+    ctx.font = '700 54px "Archivo Variable", ui-sans-serif, sans-serif';
+    ctx.fillText({ ladies: 'Ladies', gents: 'Gents', accessible: 'Accessible' }[kind], w / 2, 392);
+  });
+  // The face comes from the glTF kit, whose UVs run top-down.
+  texture.flipY = false;
+  return m.own(new THREE.MeshBasicMaterial({ map: texture }));
+}
+
+// The warning outside a room with gas fire suppression, as UK server rooms carry.
+export function gasSign(m: Materials) {
+  const w = 480;
+  const h = 320;
+  const texture = textTexture(m, w, h, (ctx) => {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#c8102e';
+    ctx.fillRect(0, 0, w, 84);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '800 54px "Archivo Variable", ui-sans-serif, sans-serif';
+    ctx.fillText('WARNING', w / 2, 44);
+    ctx.fillStyle = '#1b1f29';
+    ctx.font = '700 32px "Archivo Variable", ui-sans-serif, sans-serif';
+    ctx.fillText('Gas fire suppression', w / 2, 140);
+    ctx.font = '500 26px "Archivo Variable", ui-sans-serif, sans-serif';
+    ctx.fillText('When the alarm sounds,', w / 2, 210);
+    ctx.fillText('leave the room at once', w / 2, 250);
+  });
+  // The face comes from the glTF kit, whose UVs run top-down.
+  texture.flipY = false;
+  return m.own(new THREE.MeshBasicMaterial({ map: texture }));
+}
+
+// A face to repaint whenever what it shows changes, such as the fire alarm panel's screen.
+export function liveFace(width: number, height: number) {
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.anisotropy = 4;
+  // The face comes from the glTF kit, whose UVs run top-down.
+  texture.flipY = false;
+  const material = new THREE.MeshBasicMaterial({ map: texture });
+  return {
+    material,
+    paint: (draw: (ctx: CanvasRenderingContext2D) => void) => {
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      draw(ctx);
+      texture.needsUpdate = true;
+    },
+    dispose: () => {
+      texture.dispose();
+      material.dispose();
+    },
+  };
+}
+
+// The circuit chart beside a distribution board: numbered circuits and what each one feeds, in a section per row.
+export function chartFace(m: Materials, sections: { title: string; names: string[] }[]) {
+  const w = 512;
+  const h = 717;
+  const texture = textTexture(m, w, h, (ctx) => {
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#1b1f29';
+    ctx.font = '800 34px "Archivo Variable", ui-sans-serif, sans-serif';
+    ctx.fillText('LIGHTING CIRCUITS', w / 2, 44);
+    ctx.fillRect(28, 72, w - 56, 3);
+    const lines = sections.reduce((sum, section) => sum + section.names.length + 1.4, 0);
+    const line = Math.min(36, (h - 100) / Math.max(1, lines));
+    ctx.textAlign = 'left';
+    let y = 96;
+    let n = 0;
+    for (const section of sections) {
+      ctx.font = `800 ${Math.round(line * 0.6)}px "Archivo Variable", ui-sans-serif, sans-serif`;
+      ctx.fillText(section.title.toUpperCase(), 34, y + line * 0.5);
+      y += line * 1.2;
+      ctx.font = `500 ${Math.round(line * 0.62)}px "Archivo Variable", ui-sans-serif, sans-serif`;
+      for (const name of section.names) {
+        ctx.fillText(`${++n}`, 34, y + line * 0.5);
+        ctx.fillText(name, 92, y + line * 0.5);
+        y += line;
+      }
+      y += line * 0.2;
+    }
+  });
+  texture.flipY = false;
+  return m.own(new THREE.MeshBasicMaterial({ map: texture }));
+}
+
+// The numbers printed under a row of breakers, pitch apart from the row's start.
+export function numberStrip(m: Materials, first: number, count: number, length: number, pitch: number) {
+  const w = 1024;
+  const h = 34;
+  const texture = textTexture(m, w, h, (ctx) => {
+    ctx.fillStyle = '#f4f4f2';
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#1b1f29';
+    ctx.font = '700 24px "Archivo Variable", ui-sans-serif, sans-serif';
+    for (let i = 0; i < count; i++) ctx.fillText(`${first + i}`, ((pitch / 2 + i * pitch) / length) * w, h / 2 + 1);
+  });
+  return m.own(new THREE.MeshBasicMaterial({ map: texture }));
+}
+
+// The slot on a toilet lock: green VACANT, or red ENGAGED once locked.
+export function lockFace(m: Materials, engaged: boolean) {
+  const texture = textTexture(m, 256, 80, (ctx) => {
+    ctx.fillStyle = engaged ? '#c8102e' : '#1f8a3b';
+    ctx.fillRect(0, 0, 256, 80);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '800 40px "Archivo Variable", ui-sans-serif, sans-serif';
+    ctx.fillText(engaged ? 'ENGAGED' : 'VACANT', 128, 42);
   });
   // The face comes from the glTF kit, whose UVs run top-down.
   texture.flipY = false;

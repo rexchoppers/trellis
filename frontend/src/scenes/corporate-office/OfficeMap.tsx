@@ -6,6 +6,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { config, jobs } from '../../../wailsjs/go/models';
 import { STOREY } from './build';
 import { fireAlarm } from './alarm';
+import { installRoomLight } from './lighting';
 import { cameraRig, typing, type View } from './camera';
 import { reducedMotion } from './figure';
 import { buildFloor, fitSun, type Floor } from './floor';
@@ -63,6 +64,8 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
   useEffect(() => {
     const element = wrap.current;
     if (!element) return undefined;
+    // Before anything compiles, so every material takes the room lighting.
+    installRoomLight();
     // Plain depth buffer (not logarithmic) keeps early-z; near plane 0.1 keeps precision for the street 140 m below.
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.shadowMap.enabled = true;
@@ -78,6 +81,7 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
     world.scene.environment = environment;
     world.scene.environmentIntensity = 0.3;
     let floor: Floor | null = null;
+    let running: jobs.Job[] = [];
     let known: Set<string> | null = null;
     const rising = new Map<string, number>();
     let last = performance.now();
@@ -85,7 +89,7 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
     let raf = 0;
     const ray = new THREE.Raycaster();
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 800);
-    const rig = cameraRig(camera, () => viewRef.current, () => [...world.obstacles, ...(floor?.obstacles ?? [])], setSeated);
+    const rig = cameraRig(camera, () => viewRef.current, () => [...world.obstacles, ...(floor?.obstacles ?? []), ...(floor?.fittings.blocking() ?? [])], setSeated);
 
     const open = (hit: AgentHit, e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
@@ -113,6 +117,8 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
       alarm.update(now);
       floor?.lifts.update(now);
       floor?.stairDoor.update(now);
+      floor?.fittings.update(now);
+      floor?.servers.update(now, atDesk ? camera.position : null);
       rig.update(dt, now);
       renderer.render(world.scene, camera);
       counted.frames++;
@@ -132,8 +138,13 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
         world.scene.remove(floor.group);
         floor.dispose();
       }
-      floor = buildFloor(next, placesRef.current, nameRef.current);
-      alarm.attach(floor.callFaces);
+      const built = buildFloor(next, placesRef.current, nameRef.current);
+      floor = built;
+      // The panel and the call points' faces arrive with the kit; attach again once they have.
+      alarm.attach(built);
+      built.servers.show(running);
+      built.townHall.show(running);
+      void built.ready.then(() => floor === built && alarm.attach(built));
       world.scene.add(floor.group);
       npcs.place(floor, npcListRef.current);
       const keysNow = new Set(next.map((d) => d.key));
@@ -163,12 +174,22 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
       aim(e);
       return walkers.pick(ray);
     };
-    // A call point under the pointer.
+    // The call point under the pointer, by its number on the panel less one; -1 for none.
     const callPointAt = (e: PointerEvent) => {
-      if (!floor) return false;
+      if (!floor) return -1;
       aim(e);
       const hit = ray.intersectObjects(floor.callPoints, true)[0];
-      return !!hit && hit.distance < 60;
+      if (!hit || hit.distance >= 60) return -1;
+      for (let object: THREE.Object3D | null = hit.object; object; object = object.parent) {
+        const point = floor.callPoints.indexOf(object);
+        if (point >= 0) return point;
+      }
+      return -1;
+    };
+    const panelResetAt = (e: PointerEvent) => {
+      if (!floor) return false;
+      aim(e);
+      return floor.fittings.aimed(ray, floor.firePanel.resets);
     };
     const liftButtonAt = (e: PointerEvent) => {
       if (!floor) return false;
@@ -181,6 +202,17 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
       const hit = ray.intersectObject(floor.stairDoor.leaf, true)[0];
       return !!hit && hit.distance < 60;
     };
+    // The agent whose server is under the pointer in the server room.
+    const serverAt = (e: PointerEvent) => {
+      if (!floor) return undefined;
+      aim(e);
+      return floor.servers.hitFor(floor.fittings.first(ray, floor.servers.objects()));
+    };
+    const fittingAt = (e: PointerEvent) => {
+      if (!floor) return undefined;
+      aim(e);
+      return floor.fittings.target(ray);
+    };
 
     let drag: { x: number; y: number; moved: boolean } | null = null;
     const onDown = (e: PointerEvent) => {
@@ -189,7 +221,7 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
     };
     const onMove = (e: PointerEvent) => {
       if (!drag) {
-        canvas.style.cursor = pick(e) || callPointAt(e) || liftButtonAt(e) || stairDoorAt(e) ? 'pointer' : '';
+        canvas.style.cursor = pick(e) || callPointAt(e) >= 0 || panelResetAt(e) || liftButtonAt(e) || stairDoorAt(e) || serverAt(e) || fittingAt(e) ? 'pointer' : '';
         return;
       }
       const dx = e.clientX - drag.x;
@@ -204,9 +236,15 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
       drag = null;
       if (!clicked) return;
       // A call point is small and solid; if the click lands on one, that is what was aimed at.
-      if (callPointAt(e)) return alarm.toggle();
+      const point = callPointAt(e);
+      if (point >= 0) return alarm.trigger(point);
+      if (panelResetAt(e)) return alarm.reset();
       if (liftButtonAt(e)) return floor?.lifts.call();
       if (stairDoorAt(e)) return floor?.stairDoor.toggle();
+      const server = serverAt(e);
+      if (server) return open(server, e);
+      const use = fittingAt(e);
+      if (use) return use();
       const hit = pick(e);
       if (hit) open(hit, e);
     };
@@ -237,6 +275,9 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
       sit: rig.sit,
       setDepartments,
       setPeople: (next) => {
+        running = next;
+        floor?.servers.show(next);
+        floor?.townHall.show(next);
         if (floor) walkers.set(people(floor.plan, next));
       },
     };

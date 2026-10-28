@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 // Each piece's origin and facing: see the table at the top of assets/scenes/corporate-office/office.py.
-export type KitPiece = 'workstation' | 'exec_desk' | 'plant' | 'kitchen' | 'lift_core' | 'ceiling_light' | 'pod_screen' | 'sofa' | 'low_table' | 'sign_pillar' | 'reception' | 'waiting_room' | 'conference_room' | 'meeting_room' | 'call_point' | 'call_post' | 'lift_door' | 'stairwell' | 'fire_door' | 'smoke_detector';
+export type KitPiece = 'workstation' | 'exec_desk' | 'plant' | 'kitchen' | 'lift_core' | 'ceiling_light' | 'pod_screen' | 'sofa' | 'low_table' | 'sign_pillar' | 'reception' | 'waiting_room' | 'conference_room' | 'meeting_room' | 'call_point' | 'call_post' | 'lift_door' | 'stairwell' | 'toilets' | 'wc_door' | 'wc_door_accessible' | 'cubicle_door' | 'hand_dryer' | 'tap' | 'plant_room' | 'breaker' | 'server_room' | 'server_rack' | 'server_unit' | 'breakout' | 'printer' | 'print_room' | 'pod_door' | 'phone_pods' | 'locker_door' | 'arrival_hub' | 'town_hall' | 'feature_board' | 'feature_shelf' | 'feature_planter' | 'feature_gallery' | 'feature_display' | 'fire_door' | 'smoke_detector';
 
 let loading: Promise<Map<string, THREE.Object3D>> | undefined;
 
@@ -67,23 +67,23 @@ export function kitMaterial(name: string): Promise<THREE.Material | undefined> {
   });
 }
 
-type Marker = { kind: 'serve' | 'seat' | 'block'; x: number; z: number; rotationY: number; w: number; d: number };
+type Marker = { kind: 'serve' | 'seat' | 'block' | 'light' | 'door_ladies' | 'door_gents' | 'door_accessible' | 'door_plant' | 'door_server' | 'door_pod' | 'locker' | 'printer' | 'cubicle' | 'dryer' | 'tap' | 'cord' | 'breakers' | 'racks' | 'pane'; x: number; y: number; z: number; rotationY: number; w: number; d: number; h: number };
 
 export function kitMarkers(piece: KitPiece): Promise<Marker[]> {
   return kit().then((pieces) => {
     const markers: Marker[] = [];
     pieces.get(piece)?.traverse((object) => {
-      const { marker, w = 0, d = 0 } = object.userData as { marker?: Marker['kind']; w?: number; d?: number };
+      const { marker, w = 0, d = 0, h = 0 } = object.userData as { marker?: Marker['kind']; w?: number; d?: number; h?: number };
       // A half turn can come out of the file as flips on x and z with y at 0, so take the heading from where +z points.
       const ahead = new THREE.Vector3(0, 0, 1).applyQuaternion(object.quaternion);
-      if (marker) markers.push({ kind: marker, x: object.position.x, z: object.position.z, rotationY: Math.atan2(ahead.x, ahead.z), w, d });
+      if (marker) markers.push({ kind: marker, x: object.position.x, y: object.position.y, z: object.position.z, rotationY: Math.atan2(ahead.x, ahead.z), w, d, h });
     });
     return markers;
   });
 }
 
 // Instanced: one draw call per material however many copies there are.
-export function placeKitMany(parent: THREE.Object3D, piece: KitPiece, spots: Spot[]) {
+export function placeKitMany(parent: THREE.Object3D, piece: KitPiece, spots: Spot[], swap?: (material: THREE.Material) => THREE.Material) {
   const holder = new THREE.Group();
   parent.add(holder);
   void kit().then((pieces) => {
@@ -96,7 +96,8 @@ export function placeKitMany(parent: THREE.Object3D, piece: KitPiece, spots: Spo
     model.traverse((object) => {
       if (!(object instanceof THREE.Mesh)) return;
       const local = toPiece.clone().multiply(object.matrixWorld);
-      const mesh = new THREE.InstancedMesh(object.geometry, object.material, spots.length);
+      const material = object.material as THREE.Material;
+      const mesh = new THREE.InstancedMesh(object.geometry, swap ? swap(material) : material, spots.length);
       const matrix = new THREE.Matrix4();
       const turn = new THREE.Quaternion();
       spots.forEach((spot, i) => {
