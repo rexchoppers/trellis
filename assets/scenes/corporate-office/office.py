@@ -6,6 +6,30 @@
 #   lift_core      8 x 4 m, openings face +z with lit cars behind; "lift_display" and "call_button" painted by the scene
 #   lift_door      one door leaf, origin at its bottom centre; the scene slides them
 #   stairwell      5.4 x 6.2 m enclosed fire stair, fire door on -z; "exit_sign" painted by the scene; markers block
+#   toilets        7.6 x 6.2 m: ladies, gents and accessible WC, doors on -z, no +x wall (stands against the stairwell's -x wall); markers place the moving pieces below; see toilets()
+#   wc_door        toilet door leaf (0.9 m opening), origin on its hinge edge, leaf along +x; "wc_sign" on -z painted by the scene
+#   wc_door_accessible  the same for the 1.0 m accessible WC opening, with a thumb-turn ("thumb_turn") on +z and indicator ("wc_indicator") on -z
+#   cubicle_door   cubicle door leaf, origin on its hinge edge, leaf along +x; "thumb_turn" on +z, "wc_indicator" on -z
+#   hand_dryer     origin on the wall at floor height, faces +z; "dryer_light" lit by the scene
+#   tap            basin mixer, origin at its base, spout toward +z
+#   plant_room     6 x 6.2 m, door on -z, no +x wall (stands against the toilets' -x wall): fire alarm panel, distribution board, cleaning kit; see plant_room()
+#   breaker        circuit breaker on a DIN rail, origin on the rail, faces +z; "breaker_lever" moved by the scene
+#   server_room    6 x 6.2 m, door and viewing window on -z, no +x wall (stands against the plant room's -x wall); see server_room()
+#   server_rack    42U rack, open front toward +z; "rack_top" takes the department's colour
+#   server_unit    2U server, origin at the bottom middle of its front, faces +z; "server_led" painted by the scene
+#   breakout       12 x 8 m open area: sofas, bean bags, table tennis, table football; markers seat, block
+#   printer        floor-standing printer, front toward +z; paper comes out at y 0.75
+#   print_room     5 x 7.1 m print room furniture; the scene adds glass walls; see print_room()
+#   pod_door       phone pod glass door, origin on its hinge edge, leaf along +x; "pod_glass" made see-through by the scene
+#   phone_pods     three phone pods in a row, glass fronts toward -z; markers door_pod, block
+#   locker_door    locker door, origin on its hinge edge at its bottom, leaf along +x
+#   arrival_hub    9.6 m wall along z, origin at its middle: 18 lockers, parcel lockers and two vending machines on its +x face; markers locker, pane, block
+#   feature_planter 6.8 m waist-high oak planter along z with trees and ivy, origin at its middle; markers block
+#   feature_board  6.8 m freestanding wall along z in "felt" tinted per department: whiteboard, pinboard, clock and cabinet on +x; markers block
+#   feature_gallery 6.8 m freestanding green wall along z: framed prints, picture lights, bench and plant on +x; markers block
+#   feature_shelf  6.8 m open oak shelving along z with books and plants, origin at its middle; markers block
+#   feature_display 6.8 m open oak shelving along z like feature_shelf, with trophies, photos, games and plants; markers block
+#   town_hall      12 x 12 m corner: L of stepped seating along the windows on -z and +x facing a media wall at 45 degrees, whose "hall_screen" the scene paints; markers block
 #   pod_screen     felt spine along x between two facing desk pairs; "felt" material is tinted per department
 #   sofa           faces +z
 #   low_table      coffee table
@@ -22,6 +46,7 @@
 
 import math
 import os
+import random
 import sys
 
 import bpy
@@ -142,6 +167,68 @@ M = {
     "worktop": material("worktop", "#e6e3dd", 0.3),
     "cabinet": material("cabinet", "#f4f2ed", 0.5),
     "glass_dark": material("glass_dark", "#1b1f24", 0.1),
+    "laminate": material("laminate", "#c9d1d6", 0.5),
+    "mirror": material("mirror", "#e9edf0", 0.05, 1.0),
+    "wc_sign": material("wc_sign", "#ffffff", 0.5),
+    "wc_indicator": material("wc_indicator", "#1f8a3b", 0.5),
+    "thumb_turn": material("thumb_turn", "#9aa0a6", 0.3, 0.8),
+    "flush_plate": material("flush_plate", "#b9bdc2", 0.3, 0.9),
+    "tap": material("tap", "#d2d6da", 0.15, 1.0),
+    "dryer": material("dryer", "#eceae6", 0.4),
+    "dryer_light": material("dryer_light", "#33393f", 0.4),
+    "pull_cord": material("pull_cord", "#c8102e", 0.5),
+    "alarm_reset": material("alarm_reset", "#2b6cb0", 0.4),
+    "alarm_lamp": material("alarm_lamp", "#5a1414", 0.3),
+    "epoxy": material("epoxy", "#8d949a", 0.55),
+    "panel_body": material("panel_body", "#cfccc4", 0.5),
+    "fire_screen": material("fire_screen", "#0e1a12", 0.4),
+    "panel_reset": material("panel_reset", "#f2c200", 0.4),
+    "board": material("board", "#d6d8da", 0.5),
+    "board_chart": material("board_chart", "#ffffff", 0.6),
+    "breaker": material("breaker", "#f1f0ec", 0.5),
+    "breaker_lever": material("breaker_lever", "#25282d", 0.4),
+    "mop_yellow": material("mop_yellow", "#f2c21b", 0.5),
+    "vac": material("vac", "#2f6fb0", 0.4),
+    "raised_floor": material("raised_floor", "#b3b7bc", 0.5),
+    "vent_tile": material("vent_tile", "#80868d", 0.6),
+    "tile_line": material("tile_line", "#6e7378", 0.7),
+    "crac": material("crac", "#e4e6e8", 0.45),
+    "rack_black": material("rack_black", "#1b1d21", 0.5, 0.3),
+    "rack_top": material("rack_top", "#3a3f47", 0.5),
+    "server_body": material("server_body", "#2a2d33", 0.45, 0.4),
+    "server_led": material("server_led", "#15181c", 0.4),
+    "gas_sign": material("gas_sign", "#ffffff", 0.5),
+    "cable": material("cable", "#2b5d9c", 0.8),
+    "tt_green": material("tt_green", "#1f6b4a", 0.5),
+    "foos_red": material("foos_red", "#c43a31", 0.5),
+    "foos_blue": material("foos_blue", "#2f5fa8", 0.5),
+    "bean_orange": material("bean_orange", "#d9822b", 0.9),
+    "print_carpet": material("print_carpet", "#4a505a", 1.0),
+    "paper": material("paper", "#f7f7f4", 0.8),
+    "locker": material("locker", "#5d6b78", 0.45, 0.2),
+    "pod_shell": material("pod_shell", "#e8e5df", 0.6),
+    "pod_glass": material("pod_glass", "#dcecf5", 0.1),
+    "coat_navy": material("coat_navy", "#2c3448", 0.9),
+    "coat_camel": material("coat_camel", "#b08a5a", 0.9),
+    "hall_carpet": material("hall_carpet", "#5b6773", 1.0),
+    "media_wall": material("media_wall", "#2a2d31", 0.7),
+    "hall_screen": material("hall_screen", "#0d1117", 0.3),
+    "olive": material("olive", "#6f8a6a", 0.75),
+    "leaf_dark": material("leaf_dark", "#2f5a2a", 0.6),
+    "whiteboard": material("whiteboard", "#f5f6f4", 0.2),
+    "cork": material("cork", "#c49866", 0.95),
+    "sticky_yellow": material("sticky_yellow", "#ffd84d", 0.8),
+    "sticky_pink": material("sticky_pink", "#ff9db5", 0.8),
+    "sticky_green": material("sticky_green", "#8fe0a0", 0.8),
+    "sticky_blue": material("sticky_blue", "#8cc8ff", 0.8),
+    "gallery_paint": material("gallery_paint", "#2f4a3d", 0.85),
+    "parcel_body": material("parcel_body", "#3a3f47", 0.5, 0.2),
+    "parcel_door": material("parcel_door", "#d5d8dc", 0.45, 0.3),
+    "parcel_screen": material("parcel_screen", "#3a8fd6", 0.3, glow=1.2),
+    "vend_body": material("vend_body", "#23262c", 0.45, 0.2),
+    "vend_light": material("vend_light", "#f4f1e8", 0.5, glow=0.8),
+    "vend_red": material("vend_red", "#d9483b", 0.4, glow=1.5),
+    "vend_blue": material("vend_blue", "#2f7fd6", 0.4, glow=1.5),
 }
 
 
@@ -302,14 +389,16 @@ def plant():
     cyl(p, M["trunk"], 0.025, 0.7, 0, 0.75, 0, verts=8)
 
 
-def marker(parent, kind, x, z, rot_y=0.0, w=0.0, d=0.0):
+def marker(parent, kind, x, z, rot_y=0.0, w=0.0, d=0.0, y=0.0, h=0.0):
     """An empty the scene reads by its "marker" property; merge() keeps it."""
     obj = bpy.data.objects.new(f"{parent.name}_{kind}", None)
     bpy.context.scene.collection.objects.link(obj)
     obj["marker"] = kind
     if w:
         obj["w"], obj["d"] = w, d
-    return place(obj, parent, x, 0, z, rot_y)
+    if h:
+        obj["h"] = h
+    return place(obj, parent, x, y, z, rot_y)
 
 
 def coffee_counter(p, cx, cz):
@@ -412,8 +501,9 @@ def kitchen():
         plant_parts(pot, 0.2, 0.38, [(0, 0.75, 0, 0.3), (0.15, 0.6, 0.08, 0.22), (-0.14, 0.62, -0.06, 0.22)])
 
 
-def face_plane(p, mat, w, h, x, y, z, facing):
-    """A flat face w x h centred at x, y, z, looking toward +z (facing 1) or -z (facing -1)."""
+def face_plane(p, mat, w, h, x, y, z, facing, turn=None):
+    """A flat face w x h centred at x, y, z, looking toward +z (facing 1) or -z (facing -1); turn instead
+    turns it about the vertical from +z (math.pi / 2 looks toward +x)."""
     bpy.ops.mesh.primitive_plane_add(size=1)
     board = bpy.context.active_object
     board.name = f"{p.name}_{mat.name}"
@@ -421,7 +511,7 @@ def face_plane(p, mat, w, h, x, y, z, facing):
     bpy.ops.object.transform_apply(scale=True)
     board.data.materials.append(mat)
     place(board, p, x, y, z)
-    board.rotation_euler = (math.radians(90), 0, 0 if facing > 0 else math.pi)
+    board.rotation_euler = (math.radians(90), 0, turn if turn is not None else 0 if facing > 0 else math.pi)
     return board
 
 
@@ -530,6 +620,993 @@ def stairwell():
     marker(p, "block", (-w / 2 + left) / 2, fz, w=left + w / 2, d=t)
     marker(p, "block", (right + w / 2) / 2, fz, w=w / 2 - right, d=t)
     marker(p, "block", door_x, fz, w=1.0, d=0.3)
+
+
+def wc_frame(p, x, width, z, t):
+    """The white frame of a door opening width wide at x, in a front wall t thick centred on z."""
+    jamb = 0.04
+    for side in (-1, 1):
+        box(p, M["trim"], jamb, 2.1, t + 0.02, x + side * (width / 2 - jamb / 2), 1.05, z, round_=0.004)
+    box(p, M["trim"], width, jamb, t + 0.02, x, 2.1 - jamb / 2, z, round_=0.004)
+    return x - width / 2 + jamb + 0.003
+
+
+def lock_parts(p, x, y, inside, outside):
+    """A thumb-turn on the inside face (z = inside) and its VACANT/ENGAGED indicator on the outside face (z = outside)."""
+    box(p, M["steel"], 0.05, 0.05, 0.01, x, y, inside + 0.005, round_=0.004)
+    box(p, M["thumb_turn"], 0.015, 0.05, 0.02, x, y, inside + 0.02, round_=0.005)
+    box(p, M["steel"], 0.09, 0.04, 0.01, x, y, outside - 0.005, round_=0.004)
+    face_plane(p, M["wc_indicator"], 0.07, 0.022, x, y, outside - 0.0106, -1)
+
+
+def wc_door(name, leaf, lock):
+    """An oak toilet door leaf, origin on its hinge edge at the floor, centred on z = 0; the leaf runs along +x.
+    Levers both sides at the latch, "wc_sign" on the -z face painted by the scene; with lock, a thumb-turn
+    on +z and an indicator on -z."""
+    p = piece(name)
+    box(p, M["oak"], leaf, 2.05, 0.045, leaf / 2, 1.03, 0, round_=0.004)
+    rose = leaf - 0.07
+    for face in (-1, 1):
+        box(p, M["steel"], 0.05, 0.05, 0.02, rose, 1.0, face * 0.0325, round_=0.006)
+        box(p, M["steel"], 0.12, 0.02, 0.02, rose - 0.05, 1.0, face * 0.0525, round_=0.008)
+    face_plane(p, M["wc_sign"], 0.22, 0.28, leaf / 2, 1.5, -0.0245, -1)
+    if lock:
+        lock_parts(p, rose, 1.15, 0.0225, -0.0225)
+
+
+def cubicle_door():
+    """A cubicle door leaf 0.6 x 1.85 m, 0.15 m off the floor; origin on its hinge edge at the floor, leaf along +x.
+    Thumb-turn on +z (inside the cubicle), indicator on -z."""
+    p = piece("cubicle_door")
+    box(p, M["laminate"], 0.6, 1.85, 0.03, 0.3, 1.075, 0, round_=0.004)
+    lock_parts(p, 0.53, 1.0, 0.015, -0.015)
+
+
+def hand_dryer():
+    """Wall-mounted hand dryer, origin on the wall at floor height, facing +z; "dryer_light" lit by the scene while it runs."""
+    p = piece("hand_dryer")
+    box(p, M["dryer"], 0.3, 0.6, 0.22, 0, 1.2, 0.11, round_=0.05)
+    box(p, M["bezel"], 0.22, 0.03, 0.08, 0, 0.915, 0.13, round_=0.01)
+    box(p, M["dryer_light"], 0.08, 0.012, 0.004, 0, 1.4, 0.222, round_=0)
+
+
+def tap():
+    """A basin mixer tap, origin at its base on the counter, spout toward +z; water falls from z 0.14, y 0.189."""
+    p = piece("tap")
+    cyl(p, M["tap"], 0.025, 0.012, 0, 0.006, 0, verts=20)
+    cyl(p, M["tap"], 0.015, 0.21, 0, 0.105, 0, verts=16)
+    box(p, M["tap"], 0.022, 0.022, 0.15, 0, 0.2, 0.075, round_=0.008)
+    box(p, M["tap"], 0.012, 0.012, 0.06, 0, 0.222, 0.03, round_=0.004)
+
+
+def block(p, x0, x1, z0, z1):
+    marker(p, "block", (x0 + x1) / 2, (z0 + z1) / 2, w=x1 - x0, d=z1 - z0)
+
+
+def duct(p, xa, xb, back):
+    """Boxing 0.25 deep along the back wall at z = back that hides the cisterns, with a shelf on top."""
+    box(p, M["laminate"], xb - xa, 1.1, 0.25, (xa + xb) / 2, 0.55, back - 0.125, round_=0.004)
+    box(p, M["worktop"], xb - xa, 0.03, 0.25, (xa + xb) / 2, 1.115, back - 0.125, round_=0.004)
+    block(p, xa, xb, back - 0.25, back)
+
+
+def wc_pan(p, x, back, seat=0.42, depth=0.52):
+    """A wall-hung pan with its back on z = back, reaching toward -z; lid down."""
+    box(p, M["ceramic"], 0.36, 0.32, depth, x, seat - 0.18, back - depth / 2, round_=0.06)
+    box(p, M["cabinet"], 0.38, 0.03, depth - 0.04, x, seat - 0.005, back - depth / 2 - 0.01, round_=0.012)
+    block(p, x - 0.18, x + 0.18, back - depth, back)
+
+
+def cubicles(p, xa, xb, count, duct_z):
+    """count cubicles 1.5 m deep from xa to xb in front of a duct face at z = duct_z, a pan and flush plate in each.
+    Each door is its own piece (cubicle_door) at a "cubicle" marker on its hinge; w is the cubicle's width."""
+    front = duct_z - 1.5
+    each = (xb - xa) / count
+    side = (each - 0.6) / 2 - 0.01
+    for k in range(count):
+        cx = xa + each * (k + 0.5)
+        wc_pan(p, cx, duct_z)
+        box(p, M["flush_plate"], 0.22, 0.15, 0.012, cx, 0.95, duct_z - 0.006, round_=0.003)
+        for s in (-1, 1):
+            box(p, M["laminate"], side, 1.9, 0.03, cx + s * (each / 2 - side / 2), 1.1, front, round_=0.004)
+        marker(p, "cubicle", cx - 0.3, front, w=each)
+    for k in range(1, count):
+        x = xa + each * k
+        box(p, M["laminate"], 0.03, 1.9, 1.5, x, 1.1, front + 0.75, round_=0.004)
+        box(p, M["steel"], 0.04, 0.15, 0.04, x, 0.075, front, round_=0.004)
+        block(p, x - 0.015, x + 0.015, front, duct_z)
+    box(p, M["alu"], xb - xa, 0.03, 0.05, (xa + xb) / 2, 2.065, front, round_=0.006)
+    return front
+
+
+def vanity(p, wall_x, facing, za, zb, basins):
+    """A stone counter on the wall at x = wall_x reaching toward facing (+1 or -1 on x), from za to zb, with
+    vessel basins at the z values in basins, a "tap" marker behind each and a mirror along the wall above."""
+    depth = 0.5
+    box(p, M["stone_dark"], depth, 0.12, zb - za, wall_x + facing * depth / 2, 0.8, (za + zb) / 2, round_=0.008)
+    for z in basins:
+        cyl(p, M["ceramic"], 0.15, 0.13, wall_x + facing * 0.28, 0.925, z, r_top=0.19, verts=32)
+        cyl(p, M["grout"], 0.165, 0.004, wall_x + facing * 0.28, 0.991, z, verts=32)
+        marker(p, "tap", wall_x + facing * 0.06, z, rot_y=facing * math.pi / 2, y=0.86, h=0.993)
+    box(p, M["mirror"], 0.01, 0.8, zb - za, wall_x + facing * 0.005, 1.55, (za + zb) / 2, round_=0)
+    block(p, min(wall_x, wall_x + facing * depth), max(wall_x, wall_x + facing * depth), za, zb)
+
+
+def dryer_spot(p, wall_x, facing, z):
+    """A "dryer" marker on the wall at x = wall_x, facing +1 or -1 on x; the dryer is its own piece."""
+    marker(p, "dryer", wall_x, z, rot_y=facing * math.pi / 2)
+    block(p, min(wall_x, wall_x + facing * 0.24), max(wall_x, wall_x + facing * 0.24), z - 0.15, z + 0.15)
+
+
+def toilets():
+    """Ladies, gents and an accessible WC, 7.6 x 6.2 m, walls to the ceiling, a door each on -z. No +x wall:
+    it stands against the stairwell's -x wall. The moving parts are their own pieces, placed by the scene at
+    markers: door_ladies, door_gents, door_accessible and cubicle (doors, on their hinges), dryer, tap (y is
+    the counter, h the water level), cord (the accessible WC's pull cord) and light (ceiling panels).
+    "flush_plate", "pull_cord", "alarm_reset" and "alarm_lamp" are found by the scene; blocks mark the rest."""
+    p = piece("toilets")
+    w, d, h, t, pt = 7.6, 6.2, 3.3, 0.2, 0.1
+    x0, x1, z0, z1 = -w / 2 + t, w / 2, -d / 2 + t, d / 2 - t
+    box(p, M["tile"], w, 0.02, d, 0, 0.01, 0, round_=0)
+    box(p, M["core_wall"], w, h, t, 0, h / 2, d / 2 - t / 2, round_=0.01)
+    box(p, M["core_wall"], t, h, d - 2 * t, -w / 2 + t / 2, h / 2, 0, round_=0.01)
+    block(p, -w / 2, w / 2, z1, d / 2)
+    block(p, -w / 2, x0, z0, z1)
+    fz = -d / 2 + t / 2
+    edge = -w / 2
+    for x, width, door in ((-1.3, 0.9, "door_ladies"), (0.6, 0.9, "door_gents"), (2.75, 1.0, "door_accessible")):
+        box(p, M["core_wall"], x - width / 2 - edge, h, t, (edge + x - width / 2) / 2, h / 2, fz, round_=0.01)
+        block(p, edge, x - width / 2, -d / 2, z0)
+        box(p, M["core_wall"], width, h - 2.1, t, x, 2.1 + (h - 2.1) / 2, fz, round_=0)
+        marker(p, door, wc_frame(p, x, width, fz, t), fz, w=width)
+        edge = x + width / 2
+    box(p, M["core_wall"], w / 2 - edge, h, t, (edge + w / 2) / 2, h / 2, fz, round_=0.01)
+    block(p, edge, w / 2, -d / 2, z0)
+    # Partitions: ladies | gents full depth; the accessible WC takes the front of the gents' side, which wraps behind it.
+    box(p, M["core_wall"], pt, h, z1 - z0, -0.45, h / 2, 0, round_=0)
+    block(p, -0.5, -0.4, z0, z1)
+    box(p, M["core_wall"], pt, h, 2.4, 1.65, h / 2, z0 + 1.2, round_=0)
+    block(p, 1.6, 1.7, z0, -0.5)
+    box(p, M["core_wall"], x1 - 1.7, h, pt, (1.7 + x1) / 2, h / 2, -0.55, round_=0)
+    block(p, 1.7, x1, -0.6, -0.5)
+    duct_z = z1 - 0.25
+    for x, z in ((-2.05, -1.2), (-2.05, 1.9), (0.6, -1.6), (1.7, 0.8), (2.75, -1.75)):
+        marker(p, "light", x, z)
+
+    # Ladies: three cubicles along the back, basins and a dryer on the outside wall.
+    duct(p, x0, -0.5, z1)
+    cubicles(p, x0, -0.5, 3, duct_z)
+    vanity(p, x0, 1, -2.3, -0.3, (-1.8, -0.8))
+    dryer_spot(p, x0, 1, 0.3)
+
+    # Gents: two cubicles and two urinals with a screen between, basins on the partition.
+    duct(p, -0.4, x1, z1)
+    front = cubicles(p, -0.4, 1.6, 2, duct_z)
+    box(p, M["laminate"], 0.03, 1.9, 1.5, 1.585, 1.1, front + 0.75, round_=0.004)
+    box(p, M["steel"], 0.04, 0.15, 0.04, 1.585, 0.075, front, round_=0.004)
+    block(p, 1.57, 1.6, front, duct_z)
+    for x in (2.35, 3.15):
+        box(p, M["ceramic"], 0.36, 0.62, 0.3, x, 0.66, duct_z - 0.15, round_=0.08)
+        box(p, M["alu"], 0.1, 0.1, 0.012, x, 1.03, duct_z - 0.006, round_=0.003)
+        block(p, x - 0.18, x + 0.18, duct_z - 0.3, duct_z)
+    box(p, M["laminate"], 0.03, 0.8, 0.45, 2.75, 0.95, duct_z - 0.225, round_=0.004)
+    block(p, 2.735, 2.765, duct_z - 0.45, duct_z)
+    vanity(p, -0.4, 1, -2.2, -0.6, (-1.8, -1.0))
+    dryer_spot(p, 1.6, -1, -1.6)
+
+    # Accessible WC to Approved Document M: pan 0.5 m off the side wall with its rails, basin in reach
+    # from the seat, the red emergency pull cord with bangles at 0.9 m and 0.1 m, a reset button by the
+    # door and an alarm lamp over it outside.
+    back = -0.6
+    ax = x1 - 0.5
+    box(p, M["ceramic"], 0.5, 0.4, 0.18, ax, 0.8, back - 0.09, round_=0.03)
+    block(p, ax - 0.25, ax + 0.25, back - 0.18, back)
+    wc_pan(p, ax, back - 0.18, seat=0.47, depth=0.57)
+    box(p, M["steel"], 0.035, 0.035, 0.6, x1 - 0.06, 0.68, -1.2, round_=0.015)
+    for z in (-0.92, -1.48):
+        box(p, M["steel"], 0.06, 0.03, 0.03, x1 - 0.03, 0.68, z, round_=0.006)
+    cyl(p, M["steel"], 0.0175, 0.6, x1 - 0.06, 1.1, -1.6, verts=12)
+    for y in (0.82, 1.38):
+        box(p, M["steel"], 0.06, 0.03, 0.03, x1 - 0.03, y, -1.6, round_=0.006)
+    box(p, M["steel"], 0.1, 0.25, 0.03, ax - 0.32, 0.72, back - 0.015, round_=0.006)
+    box(p, M["steel"], 0.035, 0.035, 0.8, ax - 0.32, 0.72, back - 0.4, round_=0.015)
+    box(p, M["ceramic"], 0.38, 0.14, 0.45, x1 - 0.19, 0.78, -1.95, round_=0.04)
+    box(p, M["grout"], 0.26, 0.004, 0.3, x1 - 0.2, 0.851, -1.95, round_=0.02)
+    block(p, x1 - 0.38, x1, -2.175, -1.725)
+    marker(p, "tap", x1 - 0.05, -1.95, rot_y=-math.pi / 2, y=0.85, h=0.853)
+    box(p, M["mirror"], 0.01, 0.9, 0.5, x1 - 0.005, 1.4, -1.95, round_=0)
+    cord = 2.3
+    box(p, M["cabinet"], 0.08, 0.08, 0.04, cord, 2.9, back - 0.02, round_=0.01)
+    cyl(p, M["pull_cord"], 0.004, 2.76, cord, 1.48, back - 0.03, verts=6)
+    for y in (0.9, 0.1):
+        cyl(p, M["pull_cord"], 0.025, 0.012, cord, y, back - 0.03, verts=16)
+    marker(p, "cord", cord, back - 0.03)
+    box(p, M["cabinet"], 0.04, 0.12, 0.09, 1.72, 0.95, -2.5, round_=0.008)
+    box(p, M["alarm_reset"], 0.01, 0.04, 0.04, 1.745, 0.93, -2.5, round_=0.006)
+    box(p, M["alarm_lamp"], 0.006, 0.015, 0.015, 1.743, 0.99, -2.5, round_=0)
+    box(p, M["cabinet"], 0.16, 0.1, 0.04, 2.75, 2.4, -d / 2 - 0.02, round_=0.01)
+    box(p, M["alarm_lamp"], 0.12, 0.06, 0.01, 2.75, 2.4, -d / 2 - 0.044, round_=0.004)
+
+
+def breaker():
+    """A circuit breaker on a DIN rail, origin on the rail, facing +z; the scene moves "breaker_lever" up (on) or down (off)."""
+    p = piece("breaker")
+    box(p, M["breaker"], 0.036, 0.09, 0.065, 0, 0, 0.0325, round_=0.004)
+    box(p, M["breaker_lever"], 0.014, 0.024, 0.02, 0, 0.012, 0.072, round_=0.004)
+
+
+def plant_room():
+    """A plant room, 6 x 6.2 m, walls to the ceiling, its door on -z near the +x end. No +x wall: it stands
+    against the toilets' -x wall. The fire alarm panel is beside the distribution board on the -x wall ("fire_screen"
+    painted and "panel_reset" pressed by the scene); the board has two "breakers" rows the scene fills (y the
+    rail, w its length, rows run toward -z) and "board_chart" beside it; cleaning kit along the back. Markers: door_plant, tap, light, block."""
+    p = piece("plant_room")
+    w, d, h, t = 6.0, 6.2, 3.3, 0.2
+    x0, x1, z0, z1 = -w / 2 + t, w / 2, -d / 2 + t, d / 2 - t
+    box(p, M["epoxy"], w, 0.02, d, 0, 0.01, 0, round_=0)
+    box(p, M["core_wall"], w, h, t, 0, h / 2, d / 2 - t / 2, round_=0.01)
+    box(p, M["core_wall"], t, h, d - 2 * t, -w / 2 + t / 2, h / 2, 0, round_=0.01)
+    block(p, -w / 2, w / 2, z1, d / 2)
+    block(p, -w / 2, x0, z0, z1)
+    fz = -d / 2 + t / 2
+    door_x, door_w = 1.8, 0.9
+    box(p, M["core_wall"], door_x - door_w / 2 + w / 2, h, t, (-w / 2 + door_x - door_w / 2) / 2, h / 2, fz, round_=0.01)
+    box(p, M["core_wall"], w / 2 - door_x - door_w / 2, h, t, (door_x + door_w / 2 + w / 2) / 2, h / 2, fz, round_=0.01)
+    box(p, M["core_wall"], door_w, h - 2.1, t, door_x, 2.1 + (h - 2.1) / 2, fz, round_=0)
+    block(p, -w / 2, door_x - door_w / 2, -d / 2, z0)
+    block(p, door_x + door_w / 2, w / 2, -d / 2, z0)
+    marker(p, "door_plant", wc_frame(p, door_x, door_w, fz, t), fz, w=door_w)
+    for z in (-1.0, 1.4):
+        marker(p, "light", -0.2, z)
+
+    # Distribution board on the -x wall, its cables in trunking to the ceiling, the circuit chart to its right
+    # and the fire alarm panel to its left: a red top, the screen, and the reset button under it.
+    bz = -0.6
+    pz = 0.3
+    box(p, M["panel_body"], 0.09, 0.34, 0.42, x0 + 0.045, 1.5, pz, round_=0.01)
+    box(p, M["fire_red"], 0.094, 0.042, 0.424, x0 + 0.047, 1.65, pz, round_=0.004)
+    face_plane(p, M["fire_screen"], 0.3, 0.18, x0 + 0.091, 1.5, pz, 1, turn=math.pi / 2)
+    box(p, M["panel_reset"], 0.02, 0.03, 0.06, x0 + 0.1, 1.37, pz - 0.11, round_=0.005)
+    block(p, x0, x0 + 0.1, pz - 0.21, pz + 0.21)
+    box(p, M["board"], 0.14, 0.9, 0.75, x0 + 0.07, 1.45, bz, round_=0.01)
+    box(p, M["trim"], 0.1, h - 1.9, 0.15, x0 + 0.05, (1.9 + h) / 2, bz, round_=0.004)
+    for y in (1.66, 1.3):
+        box(p, M["alu"], 0.01, 0.035, 0.7, x0 + 0.145, y, bz, round_=0.002)
+        marker(p, "breakers", x0 + 0.15, bz + 0.33, rot_y=math.pi / 2, y=y, w=0.66)
+    block(p, x0, x0 + 0.215, bz - 0.375, bz + 0.375)
+    box(p, M["cabinet"], 0.004, 0.44, 0.32, x0 + 0.002, 1.45, -1.3, round_=0)
+    face_plane(p, M["board_chart"], 0.3, 0.42, x0 + 0.0045, 1.45, -1.3, 1, turn=math.pi / 2)
+
+    # Cleaner's sink in the back corner, with a mop bucket beside it.
+    box(p, M["ceramic"], 0.6, 0.25, 0.45, -2.2, 0.675, z1 - 0.225, round_=0.03)
+    box(p, M["grout"], 0.48, 0.004, 0.33, -2.2, 0.801, z1 - 0.23, round_=0.02)
+    for sx in (-0.27, 0.27):
+        for sz in (0.03, 0.42):
+            box(p, M["steel"], 0.03, 0.55, 0.03, -2.2 + sx, 0.275, z1 - sz, round_=0.004)
+    marker(p, "tap", -2.2, z1 - 0.04, rot_y=math.pi, y=0.8, h=0.803)
+    block(p, -2.5, -1.9, z1 - 0.45, z1)
+    box(p, M["mop_yellow"], 0.4, 0.28, 0.3, -1.35, 0.2, 2.25, round_=0.03)
+    box(p, M["bezel"], 0.14, 0.16, 0.22, -1.2, 0.42, 2.25, round_=0.02)
+    for cx in (-1.5, -1.2):
+        for cz in (2.13, 2.37):
+            cyl(p, M["bezel"], 0.025, 0.05, cx, 0.025, cz, verts=12)
+    cyl(p, M["oak"], 0.012, 1.3, -1.45, 0.95, 2.25, verts=10)
+    block(p, -1.55, -1.15, 2.1, 2.4)
+
+    # Racking along the back wall with spare rolls, towels and cleaning products.
+    sx0, sx1 = 0.0, 1.8
+    sz = z1 - 0.225
+    for x in (sx0 + 0.015, sx1 - 0.015):
+        for z in (z1 - 0.43, z1 - 0.015):
+            box(p, M["steel"], 0.03, 1.8, 0.03, x, 0.9, z, round_=0.004)
+    for y in (0.12, 0.62, 1.12, 1.62):
+        box(p, M["alu"], sx1 - sx0, 0.02, 0.45, (sx0 + sx1) / 2, y, sz, round_=0.004)
+    for x in (0.25, 0.7):
+        box(p, M["cabinet"], 0.38, 0.3, 0.38, x, 0.28, sz, round_=0.02)
+        box(p, M["cabinet"], 0.38, 0.26, 0.36, x, 1.26, sz, round_=0.02)
+    box(p, M["jar"], 0.5, 0.3, 0.4, 1.35, 0.28, sz, round_=0.01)
+    box(p, M["jar"], 0.5, 0.26, 0.38, 1.35, 1.76, sz, round_=0.01)
+    for k in range(5):
+        cyl(p, M["sage" if k % 2 else "upholstery"], 0.045, 0.26, 0.15 + k * 0.12, 0.76, sz - 0.05, verts=16)
+    for k in range(3):
+        cyl(p, M["fire_red"], 0.035, 0.2, 1.1 + k * 0.1, 1.23, sz + 0.05, verts=12)
+    block(p, sx0, sx1, z1 - 0.45, z1)
+
+    # Cleaning trolley in front of the racking, and a vacuum in the corner.
+    tx, tz = 1.2, 1.15
+    box(p, M["dryer_light"], 0.95, 0.08, 0.48, tx, 0.12, tz, round_=0.02)
+    box(p, M["dryer_light"], 0.95, 0.9, 0.04, tx, 0.61, tz + 0.22, round_=0.01)
+    box(p, M["dryer_light"], 0.95, 0.04, 0.48, tx, 1.06, tz, round_=0.01)
+    cyl(p, M["mop_yellow"], 0.2, 0.6, tx + 0.25, 0.46, tz - 0.02, verts=20)
+    cyl(p, M["fire_red"], 0.1, 0.18, tx - 0.3, 0.25, tz, verts=16)
+    cyl(p, M["upholstery"], 0.1, 0.18, tx - 0.08, 0.25, tz, verts=16)
+    for wx in (tx - 0.42, tx + 0.42):
+        for wz in (tz - 0.2, tz + 0.2):
+            cyl(p, M["bezel"], 0.04, 0.08, wx, 0.04, wz, verts=12)
+    block(p, tx - 0.48, tx + 0.48, tz - 0.25, tz + 0.25)
+    cyl(p, M["vac"], 0.17, 0.3, 2.5, 0.17, 2.55, verts=24)
+    cyl(p, M["bezel"], 0.172, 0.05, 2.5, 0.345, 2.55, verts=24)
+    cyl(p, M["alu"], 0.015, 0.9, 2.5, 0.8, 2.75, verts=10)
+    block(p, 2.33, 2.67, 2.38, 2.77)
+    # A folded wet floor sign against the wall.
+    box(p, M["mop_yellow"], 0.04, 0.62, 0.3, x0 + 0.04, 0.31, 1.0, round_=0.01)
+
+
+def server_rack():
+    """A 42U rack, 0.6 x 2.06 x 1.0 m, origin at the floor in its middle, open front toward +z; "rack_top" takes the
+    department's colour. Servers (server_unit) slide in with their fronts at z 0.43, from y 1.85 down in 0.1 m slots."""
+    p = piece("server_rack")
+    for side in (-1, 1):
+        box(p, M["rack_black"], 0.02, 2.0, 1.0, side * 0.29, 1.0, 0, round_=0.004)
+        box(p, M["alu"], 0.02, 1.9, 0.02, side * 0.25, 1.0, 0.44, round_=0.003)
+    box(p, M["rack_top"], 0.6, 0.04, 1.0, 0, 2.02, 0, round_=0.006)
+    box(p, M["rack_black"], 0.6, 0.08, 1.0, 0, 0.04, 0, round_=0.004)
+    box(p, M["rack_black"], 0.56, 1.92, 0.02, 0, 1.0, -0.49, round_=0.002)
+
+
+def server_unit():
+    """A 2U server, origin at the bottom middle of its front face, front toward +z; "server_led" painted by the scene."""
+    p = piece("server_unit")
+    box(p, M["server_body"], 0.48, 0.085, 0.7, 0, 0.0425, -0.35, round_=0.004)
+    box(p, M["bezel"], 0.48, 0.085, 0.012, 0, 0.0425, -0.006, round_=0.003)
+    for x in (0.04, 0.12, 0.2):
+        box(p, M["alu"], 0.07, 0.06, 0.004, x, 0.0425, 0.002, round_=0.002)
+    box(p, M["server_led"], 0.12, 0.014, 0.004, -0.15, 0.0425, 0.002, round_=0)
+
+
+def server_room():
+    """A server room, 6 x 6.2 m, walls to the ceiling, a door and a viewing window on -z. No +x wall: it stands
+    against the plant room's -x wall. Two "racks" rows the scene fills with server_rack (rows run toward -x from
+    the marker, fronts toward -z, w the row's length), a "pane" marker for the window's glass (w wide, d high, y
+    its middle), "gas_sign" outside painted by the scene; air-con, gas suppression and cable trays inside.
+    Markers: door_server, racks, pane, light, block."""
+    p = piece("server_room")
+    w, d, h, t = 6.0, 6.2, 3.3, 0.2
+    x0, x1, z0, z1 = -w / 2 + t, w / 2, -d / 2 + t, d / 2 - t
+    box(p, M["raised_floor"], w, 0.02, d, 0, 0.01, 0, round_=0)
+    for k in range(1, 10):
+        box(p, M["tile_line"], 0.008, 0.002, z1 - z0, x0 + k * 0.6, 0.0225, 0, round_=0)
+        box(p, M["tile_line"], x1 - x0, 0.002, 0.008, (x0 + x1) / 2, 0.0225, z0 + k * 0.6, round_=0)
+    for k in range(7):
+        box(p, M["vent_tile"], 0.58, 0.002, 0.58, 1.9 - k * 0.6, 0.021, -0.8, round_=0)
+    box(p, M["core_wall"], w, h, t, 0, h / 2, d / 2 - t / 2, round_=0.01)
+    box(p, M["core_wall"], t, h, d - 2 * t, -w / 2 + t / 2, h / 2, 0, round_=0.01)
+    block(p, -w / 2, w / 2, z1, d / 2)
+    block(p, -w / 2, x0, z0, z1)
+
+    # Front wall: a viewing window (1.8 x 1.2 m) on the left as you face it from the floor, the door on the right.
+    fz = -d / 2 + t / 2
+    win_x, win_w, sill, head = -1.0, 1.8, 0.9, 2.1
+    door_x, door_w = 1.9, 0.9
+    box(p, M["core_wall"], win_x - win_w / 2 + w / 2, h, t, (-w / 2 + win_x - win_w / 2) / 2, h / 2, fz, round_=0.01)
+    box(p, M["core_wall"], win_w, sill, t, win_x, sill / 2, fz, round_=0)
+    box(p, M["core_wall"], win_w, h - head, t, win_x, head + (h - head) / 2, fz, round_=0)
+    box(p, M["core_wall"], door_x - door_w / 2 - (win_x + win_w / 2), h, t, (win_x + win_w / 2 + door_x - door_w / 2) / 2, h / 2, fz, round_=0.01)
+    box(p, M["core_wall"], w / 2 - door_x - door_w / 2, h, t, (door_x + door_w / 2 + w / 2) / 2, h / 2, fz, round_=0.01)
+    box(p, M["core_wall"], door_w, h - 2.1, t, door_x, 2.1 + (h - 2.1) / 2, fz, round_=0)
+    for y in (sill, head):
+        box(p, M["trim"], win_w + 0.04, 0.04, t + 0.02, win_x, y, fz, round_=0.004)
+    for side in (-1, 1):
+        box(p, M["trim"], 0.04, head - sill, t + 0.02, win_x + side * (win_w / 2), (sill + head) / 2, fz, round_=0.004)
+    marker(p, "pane", win_x, fz, w=win_w, d=head - sill, y=(sill + head) / 2)
+    block(p, -w / 2, door_x - door_w / 2, -d / 2, z0)
+    block(p, door_x + door_w / 2, w / 2, -d / 2, z0)
+    marker(p, "door_server", wc_frame(p, door_x, door_w, fz, t), fz, w=door_w)
+    # Card reader by the door and the gas warning beside it, outside.
+    box(p, M["bezel"], 0.07, 0.11, 0.03, door_x - door_w / 2 - 0.2, 1.1, -d / 2 - 0.015, round_=0.006)
+    box(p, M["green_light"], 0.03, 0.008, 0.004, door_x - door_w / 2 - 0.2, 1.14, -d / 2 - 0.031, round_=0)
+    face_plane(p, M["gas_sign"], 0.3, 0.2, 2.7, 1.55, -d / 2 - 0.002, -1)
+    for x, z in ((0.1, -1.6), (0.1, 0.9)):
+        marker(p, "light", x, z)
+
+    # Two rows of racks facing the window, filled by the scene, with cable trays above them.
+    for rz in (0.0, 1.75):
+        marker(p, "racks", 2.2, rz, rot_y=math.pi, w=4.2)
+        box(p, M["alu"], 4.4, 0.02, 0.3, 0.1, 2.6, rz, round_=0.003)
+        for side in (-1, 1):
+            box(p, M["alu"], 4.4, 0.06, 0.01, 0.1, 2.63, rz + side * 0.15, round_=0.002)
+        box(p, M["cable"], 4.3, 0.05, 0.2, 0.1, 2.635, rz, round_=0.02)
+        for x in (-1.9, 0.1, 2.1):
+            cyl(p, M["steel"], 0.006, h - 2.66, x, (2.66 + h) / 2, rz, verts=6)
+
+    # Air-con unit on the left wall, its grilles toward the room.
+    box(p, M["crac"], 0.85, 1.9, 1.8, x0 + 0.425, 0.95, -1.7, round_=0.01)
+    for y in (0.45, 1.05):
+        box(p, M["bezel"], 0.01, 0.45, 1.6, x0 + 0.851, y, -1.7, round_=0)
+    box(p, M["glass_dark"], 0.01, 0.12, 0.2, x0 + 0.852, 1.65, -1.7, round_=0)
+    box(p, M["green_light"], 0.004, 0.015, 0.015, x0 + 0.856, 1.65, -1.55, round_=0)
+    block(p, x0, x0 + 0.85, -2.6, -0.8)
+
+    # Gas suppression: two red cylinders in the back corner, piped to the ceiling, and the release unit by the door.
+    for x in (2.4, 2.72):
+        cyl(p, M["fire_red"], 0.13, 1.4, x, 0.7, 2.65, verts=24)
+        cyl(p, M["steel"], 0.05, 0.12, x, 1.46, 2.65, verts=12)
+        cyl(p, M["steel"], 0.02, h - 1.52, x, (1.52 + h) / 2, 2.65, verts=8)
+    box(p, M["steel"], 0.66, 0.04, 0.03, 2.56, 1.0, 2.79 + 0.015, round_=0.004)
+    block(p, 2.27, 2.85, 2.52, 2.9)
+    box(p, M["mop_yellow"], 0.12, 0.16, 0.05, 2.75, 1.4, z0 + 0.025, round_=0.01)
+    box(p, M["fire_red"], 0.04, 0.04, 0.02, 2.75, 1.4, z0 + 0.06, round_=0.006)
+
+
+def lounge_sofa(p, x, z, facing):
+    """A three-seat sofa sitting toward facing (+1 or -1 on z), with a seat marker per cushion."""
+    box(p, M["upholstery"], 2.0, 0.42, 0.85, x, 0.21, z, round_=0.06)
+    box(p, M["upholstery"], 2.0, 0.48, 0.22, x, 0.62, z - facing * 0.32, round_=0.06)
+    for side in (-1, 1):
+        box(p, M["upholstery"], 0.2, 0.62, 0.85, x + side * 0.9, 0.31, z, round_=0.05)
+    for dx in (-0.55, 0, 0.55):
+        box(p, M["upholstery"], 0.55, 0.1, 0.6, x + dx, 0.47, z + facing * 0.06, round_=0.04)
+        marker(p, "seat", x + dx, z + facing * 0.1, rot_y=0 if facing > 0 else math.pi)
+    block(p, x - 1.0, x + 1.0, z - 0.43, z + 0.43)
+
+
+def breakout():
+    """The breakout area, 12 x 8 m, open on every side: sofas round a low table and bean bags on a rug on the
+    left, a table tennis table and a table football table on the right. Markers: seat, block."""
+    p = piece("breakout")
+    box(p, M["rug"], 5.4, 0.02, 4.4, -2.8, 0.01, 0.2, round_=0)
+    lounge_sofa(p, -2.8, -1.3, 1)
+    lounge_sofa(p, -2.8, 1.7, -1)
+    box(p, M["walnut"], 1.2, 0.04, 0.6, -2.8, 0.4, 0.2, round_=0.01)
+    for sx in (-0.52, 0.52):
+        for sz in (-0.24, 0.24):
+            box(p, M["steel"], 0.04, 0.38, 0.04, -2.8 + sx, 0.19, 0.2 + sz, round_=0.005)
+    block(p, -3.4, -2.2, -0.1, 0.5)
+    for k, (bx, bz) in enumerate(((-5.0, -0.6), (-5.1, 0.6), (-4.6, 1.6))):
+        blob(p, M[("bean_orange", "sage", "foos_blue")[k]], 0.42, bx, 0.24, bz, squash=0.6)
+        marker(p, "seat", bx, bz, rot_y=math.pi / 2)
+        block(p, bx - 0.4, bx + 0.4, bz - 0.4, bz + 0.4)
+    small_plant(p, "breakout_plant", -5.5, 3.4)
+    block(p, -5.75, -5.25, 3.15, 3.65)
+
+    # Table tennis: a regulation 2.74 x 1.525 m table, net across the middle, a bat each end.
+    tx, tz = 3.0, -1.5
+    box(p, M["tt_green"], 2.74, 0.03, 1.525, tx, 0.745, tz, round_=0.004)
+    for z in (-0.7525, 0.7525):
+        box(p, M["trim"], 2.74, 0.002, 0.02, tx, 0.761, tz + z, round_=0)
+    for x in (-1.36, 1.36):
+        box(p, M["trim"], 0.02, 0.002, 1.525, tx + x, 0.761, tz, round_=0)
+    box(p, M["trim"], 2.74, 0.002, 0.006, tx, 0.761, tz, round_=0)
+    box(p, M["bezel"], 0.012, 0.15, 1.7, tx, 0.835, tz, round_=0.002)
+    for x in (-1.1, 1.1):
+        for z in (-0.6, 0.6):
+            box(p, M["steel"], 0.04, 0.73, 0.04, tx + x, 0.365, tz + z, round_=0.006)
+    box(p, M["foos_red"], 0.15, 0.012, 0.16, tx - 1.0, 0.766, tz + 0.3, round_=0.02)
+    box(p, M["bezel"], 0.15, 0.012, 0.16, tx + 1.05, 0.766, tz - 0.35, round_=0.02)
+    block(p, tx - 1.37, tx + 1.37, tz - 0.77, tz + 0.77)
+
+    # Table football: a cabinet with rods across it, red players one way, blue the other.
+    fx, fz = 3.0, 2.0
+    for z in (-0.355, 0.355):
+        box(p, M["oak"], 1.4, 0.2, 0.05, fx, 0.82, fz + z, round_=0.008)
+    for x in (-0.675, 0.675):
+        box(p, M["oak"], 0.05, 0.2, 0.66, fx + x, 0.82, fz, round_=0.008)
+    box(p, M["tt_green"], 1.3, 0.02, 0.66, fx, 0.73, fz, round_=0)
+    for x in (-0.6, 0.6):
+        for z in (-0.3, 0.3):
+            box(p, M["bezel"], 0.06, 0.72, 0.06, fx + x, 0.36, fz + z, round_=0.008)
+    for k in range(8):
+        x = fx - 0.55 + k * (1.1 / 7)
+        box(p, M["steel"], 0.016, 0.016, 1.0, x, 0.88, fz, round_=0.006)
+        for side in (-1, 1):
+            box(p, M["bezel"], 0.035, 0.035, 0.1, x, 0.88, fz + side * 0.55, round_=0.01)
+        players = (1, 2, 3, 5, 5, 3, 2, 1)[k]
+        for n in range(players):
+            z = fz + (n - (players - 1) / 2) * (0.6 / max(players, 2))
+            box(p, M["foos_red" if k in (0, 1, 3, 5) else "foos_blue"], 0.03, 0.12, 0.05, x, 0.82, z, round_=0.008)
+    block(p, fx - 0.7, fx + 0.7, fz - 0.6, fz + 0.6)
+
+
+def printer():
+    """A floor-standing office printer, origin at its base in the middle, front toward +z. Paper comes out onto the
+    dark tray on its lower body (y 0.754) in the gap under the scanner; the scene slides a sheet out there."""
+    p = piece("printer")
+    box(p, M["cabinet"], 0.6, 0.75, 0.65, 0, 0.375, 0, round_=0.01)
+    for y in (0.2, 0.45):
+        box(p, M["bezel"], 0.5, 0.008, 0.004, 0, y, 0.326, round_=0)
+    box(p, M["bezel"], 0.5, 0.004, 0.5, 0, 0.752, 0.05, round_=0)
+    box(p, M["cabinet"], 0.6, 0.2, 0.25, 0, 0.85, -0.2, round_=0.008)
+    box(p, M["cabinet"], 0.6, 0.15, 0.65, 0, 1.025, 0, round_=0.01)
+    box(p, M["bezel"], 0.58, 0.01, 0.6, 0, 1.105, 0, round_=0.004)
+    box(p, M["glass_dark"], 0.24, 0.02, 0.1, 0.12, 1.115, 0.25, round_=0.004)
+    box(p, M["green_light"], 0.012, 0.006, 0.012, -0.05, 1.112, 0.27, round_=0)
+
+
+def print_room():
+    """The print room's furniture, 5 x 7.1 m; the scene puts glass walls round it like a meeting room's, the
+    doorway on -z at x 1.2 and the building's windows on +z. The printer ("printer" marker) on the -x side, a
+    paper worktop along the back, shelving, a shredder and recycling bins. Markers: printer, block."""
+    p = piece("print_room")
+    w, d = 5.0, 7.1
+    x0, x1, z0, z1 = -2.3, 2.3, -3.35, 3.35
+    box(p, M["print_carpet"], w, 0.02, d, 0, 0.01, 0, round_=0)
+
+    marker(p, "printer", x0 + 0.35, 0.2, rot_y=math.pi / 2)
+    block(p, x0, x0 + 0.68, -0.1, 0.5)
+    # Paper worktop along the back: cupboards under, reams and a guillotine on top.
+    box(p, M["cabinet"], 3.0, 0.86, 0.58, 0, 0.43, z1 - 0.29, round_=0.01)
+    box(p, M["worktop"], 3.04, 0.04, 0.62, 0, 0.88, z1 - 0.31, round_=0.006)
+    for k, x in enumerate((-1.1, -0.8, -0.5)):
+        for n in range(3 - k):
+            box(p, M["paper"], 0.21, 0.05, 0.3, x, 0.925 + n * 0.05, z1 - 0.3, round_=0.004)
+    box(p, M["steel"], 0.45, 0.05, 0.35, 0.6, 0.925, z1 - 0.3, round_=0.01)
+    block(p, -1.5, 1.5, z1 - 0.6, z1)
+    # Shelving on the right wall with boxed paper and toner.
+    for z in (-1.0, 0.4):
+        for x in (x1 - 0.42, x1 - 0.02):
+            box(p, M["steel"], 0.03, 1.8, 0.03, x, 0.9, z, round_=0.004)
+    for y in (0.15, 0.7, 1.25, 1.75):
+        box(p, M["alu"], 0.44, 0.02, 1.4, x1 - 0.22, y, -0.3, round_=0.004)
+    for y in (0.16, 0.71, 1.26):
+        for z in (-0.75, -0.3, 0.15):
+            box(p, M["jar"], 0.36, 0.26, 0.38, x1 - 0.22, y + 0.14, z, round_=0.01)
+    block(p, x1 - 0.45, x1, -1.0, 0.4)
+    # Shredder by the shelving, and paper recycling and general waste by the front.
+    box(p, M["bezel"], 0.42, 0.68, 0.34, x1 - 0.35, 0.34, -1.5, round_=0.02)
+    box(p, M["steel"], 0.3, 0.01, 0.02, x1 - 0.35, 0.685, -1.55, round_=0)
+    block(p, x1 - 0.56, x1 - 0.14, -1.67, -1.33)
+    for k, (mat, x) in enumerate((("vac", -1.7), ("bezel", -1.15))):
+        box(p, M[mat], 0.45, 0.8, 0.42, x, 0.4, z0 + 0.3, round_=0.03)
+        box(p, M["trim" if k == 0 else "steel"], 0.3, 0.012, 0.05, x, 0.805, z0 + 0.3, round_=0.004)
+    block(p, -1.95, -0.9, z0, z0 + 0.52)
+
+
+def pod_door():
+    """A phone pod's glass door, 0.8 x 2.05 m, origin on its hinge edge at the floor, leaf along +x; "pod_glass" is
+    made see-through by the scene."""
+    p = piece("pod_door")
+    box(p, M["pod_glass"], 0.76, 1.99, 0.012, 0.4, 1.035, 0, round_=0)
+    for x in (0.015, 0.785):
+        box(p, M["alu"], 0.03, 2.05, 0.03, x, 1.025, 0, round_=0.004)
+    for y in (0.015, 2.035):
+        box(p, M["alu"], 0.8, 0.03, 0.03, 0.4, y, 0, round_=0.004)
+    box(p, M["steel"], 0.025, 0.5, 0.025, 0.72, 1.05, -0.04, round_=0.008)
+    box(p, M["steel"], 0.025, 0.5, 0.025, 0.72, 1.05, 0.04, round_=0.008)
+
+
+def phone_pods():
+    """Three acoustic phone pods in a row, 3.95 x 1.25 m, each 2.3 m tall with a roof, a glass front toward -z
+    (a door, door_pod, and a fixed pane) and a shelf desk and stool inside. Markers: door_pod, block."""
+    p = piece("phone_pods")
+    size, gap, h, t = 1.25, 0.1, 2.3, 0.06
+    for k in range(3):
+        cx = (k - 1) * (size + gap)
+        box(p, M["pod_shell"], size, 0.03, size, cx, 0.015, 0, round_=0)
+        box(p, M["pod_shell"], size, t, size, cx, h - t / 2, 0, round_=0.01)
+        box(p, M["pod_shell"], size, h, t, cx, h / 2, size / 2 - t / 2, round_=0.01)
+        box(p, M["felt"], size - 2 * t, h - 0.2, 0.02, cx, h / 2, size / 2 - t - 0.01, round_=0)
+        for side in (-1, 1):
+            box(p, M["pod_shell"], t, h, size - t, cx + side * (size / 2 - t / 2), h / 2, -t / 2, round_=0.01)
+        block(p, cx - size / 2, cx + size / 2, size / 2 - t, size / 2)
+        for side in (-1, 1):
+            block(p, cx + side * (size / 2 - t / 2) - t / 2, cx + side * (size / 2 - t / 2) + t / 2, -size / 2, size / 2)
+        # The front: a door from the left post, a fixed pane to its right, posts and a head rail.
+        fz = -size / 2 + 0.03
+        left = cx - size / 2 + t
+        box(p, M["alu"], size - 2 * t, 0.12, 0.04, cx, 2.1, fz, round_=0.004)
+        pane = size - 2 * t - 0.82
+        box(p, M["pod_glass"], pane, 2.04, 0.012, cx + size / 2 - t - pane / 2, 1.04, fz, round_=0)
+        box(p, M["alu"], 0.03, 2.04, 0.04, cx + size / 2 - t - pane - 0.015, 1.02, fz, round_=0.004)
+        block(p, cx + size / 2 - t - pane - 0.03, cx + size / 2 - t, fz - 0.02, fz + 0.02)
+        marker(p, "door_pod", left + 0.005, fz, w=0.8)
+        box(p, M["oak"], size - 2 * t, 0.03, 0.35, cx, 1.0, size / 2 - t - 0.2, round_=0.006)
+        cyl(p, M["upholstery"], 0.17, 0.05, cx, 0.66, 0.0, verts=20)
+        cyl(p, M["steel"], 0.02, 0.62, cx, 0.32, 0.0, verts=10)
+        box(p, M["diffuser"], 0.5, 0.01, 0.5, cx, h - t - 0.01, 0, round_=0)
+
+
+def locker_door():
+    """A locker door, 0.58 x 0.86 m, origin on its hinge edge at its bottom, leaf along +x, its face toward +z."""
+    p = piece("locker_door")
+    box(p, M["locker"], 0.58, 0.86, 0.02, 0.29, 0.43, 0, round_=0.004)
+    for y in (0.62, 0.66, 0.70):
+        box(p, M["bezel"], 0.3, 0.008, 0.004, 0.29, y, 0.011, round_=0)
+    box(p, M["steel"], 0.03, 0.06, 0.02, 0.52, 0.45, 0.018, round_=0.006)
+
+
+def arrival_hub():
+    """A freestanding wall 9.6 m long along z and 2.6 m high, oak slats on its -x face. Along its +x face from -z: 18
+    staff lockers (nine wide, two high), a bank of parcel lockers with a lit screen, and a snack and a drinks machine
+    behind glass ("pane" markers). Each locker door (locker_door) hangs at a "locker" marker: y its bottom, turned to
+    face +x. Origin at the wall's middle on the floor. Markers: locker, pane, block."""
+    p = piece("arrival_hub")
+    length, height = 9.6, 2.6
+    box(p, M["media_wall"], 0.2, height, length, 0, height / 2, 0, round_=0.01)
+    for n in range(48):
+        box(p, M["oak"], 0.03, height - 0.1, 0.07, -0.115, height / 2, -length / 2 + 0.1 + n * 0.2, round_=0)
+    block(p, -0.15, 0.1, -length / 2, length / 2)
+
+    lz = -4.7
+    box(p, M["locker"], 0.48, 1.86, 5.4, 0.34, 0.93, lz + 2.7, round_=0.006)
+    box(p, M["bezel"], 0.48, 0.08, 5.4, 0.34, 0.04, lz + 2.7, round_=0.004)
+    for col in range(9):
+        for row in range(2):
+            marker(p, "locker", 0.595, lz + 0.6 * (col + 1) - 0.01, rot_y=math.pi / 2, y=0.1 + row * 0.88)
+            # The dark inside of the locker, seen when its door is open.
+            box(p, M["bezel"], 0.002, 0.8, 0.54, 0.581, 0.1 + row * 0.88 + 0.43, lz + 0.3 + col * 0.6, round_=0)
+    block(p, 0.1, 0.6, lz, lz + 5.4)
+
+    # Parcel lockers: three columns of doors, the middle one with the screen.
+    pz0, pz1, ph = 0.8, 2.6, 2.0
+    box(p, M["parcel_body"], 0.6, ph, pz1 - pz0, 0.4, ph / 2, (pz0 + pz1) / 2, round_=0.01)
+    col_w = (pz1 - pz0 - 0.08) / 3
+    for c in range(3):
+        cz = pz0 + 0.04 + col_w * (c + 0.5)
+        bands = [(0.12, 0.56), (0.58, 0.88), (1.46, 1.94)] if c == 1 else [(0.12, 0.42), (0.44, 0.74), (0.76, 1.2), (1.22, 1.66), (1.68, 1.94)]
+        for y0, y1 in bands:
+            box(p, M["parcel_door"], 0.012, y1 - y0 - 0.02, col_w - 0.03, 0.706, (y0 + y1) / 2, cz, round_=0.003)
+            box(p, M["steel"], 0.012, 0.07, 0.02, 0.716, (y0 + y1) / 2, cz + col_w / 2 - 0.07, round_=0.003)
+    cz = pz0 + 0.04 + col_w * 1.5
+    box(p, M["bezel"], 0.02, 0.5, 0.44, 0.71, 1.17, cz, round_=0.006)
+    box(p, M["parcel_screen"], 0.004, 0.38, 0.3, 0.722, 1.2, cz, round_=0)
+    block(p, 0.1, 0.72, pz0, pz1)
+
+    # Vending: goods behind glass on the -z side of each machine, keypad on the +z side, lit header on top.
+    snacks = ("fire_red", "bean_orange", "foos_blue", "tt_green", "panel_reset")
+    drinks = ("foos_blue", "tt_green", "bean_orange", "fire_red", "glass_dark")
+    for vz, header, goods, shelves in ((3.2, "vend_blue", snacks, 5), (4.15, "vend_red", drinks, 4)):
+        gz = vz - 0.12
+        box(p, M["vend_body"], 0.75, 1.83, 0.9, 0.475, 0.915, vz, round_=0.02)
+        box(p, M["vend_body"], 0.1, 0.64, 0.9, 0.9, 0.32, vz, round_=0.01)
+        box(p, M["vend_body"], 0.1, 0.17, 0.9, 0.9, 1.745, vz, round_=0.01)
+        box(p, M["vend_body"], 0.1, 1.02, 0.26, 0.9, 1.15, vz + 0.32, round_=0.006)
+        box(p, M["vend_body"], 0.1, 1.02, 0.02, 0.9, 1.15, vz - 0.44, round_=0)
+        box(p, M[header], 0.004, 0.13, 0.84, 0.952, 1.745, vz, round_=0)
+        box(p, M["vend_light"], 0.004, 1.0, 0.62, 0.852, 1.15, gz, round_=0)
+        pitch = 1.0 / shelves
+        for s in range(shelves):
+            y = 0.68 + s * pitch
+            box(p, M["steel"], 0.09, 0.012, 0.62, 0.9, y, gz, round_=0)
+            for k in range(6 if shelves == 4 else 5):
+                kz = gz - 0.26 + k * (0.52 / (5 if shelves == 4 else 4))
+                mat = M[goods[(s + k) % len(goods)]]
+                if shelves == 4:
+                    cyl(p, mat, 0.03, 0.17, 0.9, y + 0.091, kz, verts=10)
+                else:
+                    box(p, mat, 0.04, 0.12, 0.09, 0.91, y + 0.07, kz, round_=0.004)
+        marker(p, "pane", 0.951, gz, rot_y=math.pi / 2, w=0.62, d=1.0, y=1.15)
+        box(p, M["vend_light"], 0.004, 0.08, 0.16, 0.952, 1.42, vz + 0.32, round_=0)
+        for row in range(4):
+            for c in range(3):
+                box(p, M["steel"], 0.006, 0.025, 0.035, 0.953, 1.3 - row * 0.04, vz + 0.27 + c * 0.05, round_=0)
+        box(p, M["bezel"], 0.006, 0.07, 0.03, 0.953, 1.05, vz + 0.32, round_=0)
+        box(p, M["bezel"], 0.006, 0.18, 0.5, 0.953, 0.32, gz, round_=0.004)
+    block(p, 0.1, 0.96, 2.75, 4.6)
+
+
+def feature_planter():
+    """A waist-high oak planter 6.8 m long along z: fig trees, an olive tree, snake plants and low planting, with ivy
+    trailing over both sides. Origin at its middle on the floor. Markers: block."""
+    p = piece("feature_planter")
+    length, height, deep = 6.6, 0.85, 0.5
+    rng = random.Random(3)
+    box(p, M["bezel"], deep - 0.06, 0.06, length - 0.06, 0, 0.03, 0, round_=0)
+    box(p, M["walnut"], deep - 0.04, height - 0.1, length, 0, height / 2 + 0.02, 0, round_=0)
+    for side in (-1, 1):
+        for n in range(55):
+            box(p, M["oak"], 0.03, height - 0.12, 0.09, side * (deep / 2 - 0.02), height / 2 + 0.02, -length / 2 + 0.06 + n * 0.12, round_=0)
+        box(p, M["oak"], 0.07, 0.04, length + 0.04, side * (deep / 2 - 0.015), height + 0.02, 0, round_=0.006)
+        box(p, M["oak"], deep + 0.04, 0.04, 0.07, 0, height + 0.02, side * (length / 2 - 0.015), round_=0.006)
+    box(p, M["soil"], deep - 0.08, 0.02, length - 0.08, 0, height - 0.01, 0, round_=0)
+    for z in (-2.5, 2.5):
+        cyl(p, M["trunk"], 0.025, 1.25, 0, height + 0.625, z, verts=8)
+        for k in range(11):
+            a = k * 2.4
+            blob(p, M["leaf" if k % 2 else "leaf_light"], 0.11, math.cos(a) * 0.13, 1.2 + k * 0.085, z + math.sin(a) * 0.13, squash=0.7)
+        blob(p, M["leaf_light"], 0.1, 0, 2.15, z, squash=0.8)
+    cyl(p, M["trunk"], 0.04, 0.85, 0, height + 0.425, 0, verts=10)
+    for _ in range(16):
+        blob(p, M[rng.choice(("sage", "olive"))], rng.uniform(0.13, 0.19), rng.uniform(-0.22, 0.22), rng.uniform(1.75, 2.1), rng.uniform(-0.45, 0.45), squash=0.75)
+    for z in (-1.3, 1.3):
+        for k in range(9):
+            h = rng.uniform(0.45, 0.8)
+            box(p, M["leaf_dark" if k % 2 else "leaf"], 0.012, h, 0.06, rng.uniform(-0.08, 0.08), height + h / 2, z + rng.uniform(-0.12, 0.12), rot_y=rng.uniform(0, math.pi), round_=0)
+    for z in (-2.9, -1.9, -0.7, 0.7, 1.9, 2.9):
+        for _ in range(3):
+            blob(p, M[rng.choice(("leaf", "leaf_light"))], rng.uniform(0.13, 0.18), rng.uniform(-0.1, 0.1), height + 0.1 + rng.uniform(0, 0.08), z + rng.uniform(-0.2, 0.2), squash=0.7)
+    for side in (-1, 1):
+        for z in (-3.0, -2.2, -1.1, -0.3, 0.6, 1.5, 2.3, 3.0):
+            for k in range(rng.randint(3, 6)):
+                box(p, M["leaf" if k % 2 else "leaf_light"], 0.02, 0.05, 0.06, side * (deep / 2 + 0.035), height - 0.01 - k * 0.08, z + math.sin(k * 1.3) * 0.04, rot_y=rng.uniform(-0.6, 0.6), round_=0)
+    block(p, -0.3, 0.3, -length / 2, length / 2)
+
+
+def feature_board():
+    """A freestanding team wall 6.8 m long along z in acoustic "felt" the scene tints per department, with a whiteboard of
+    sticky notes, a pinboard, a clock and a low cabinet on its +x face. Origin at its middle on the floor. Markers: block."""
+    p = piece("feature_board")
+    length, height, face = 6.6, 2.5, 0.05
+    rng = random.Random(5)
+    box(p, M["bezel"], 0.12, 0.1, length, 0, 0.05, 0, round_=0)
+    box(p, M["felt"], 0.1, height - 0.1, length, 0, height / 2 + 0.05, 0, round_=0.01)
+    box(p, M["oak"], 0.14, 0.03, length + 0.04, 0, height + 0.015, 0, round_=0.006)
+    box(p, M["alu"], 0.02, 1.15, 3.3, face + 0.01, 1.525, 1.3, round_=0.004)
+    box(p, M["whiteboard"], 0.006, 1.05, 3.2, face + 0.023, 1.525, 1.3, round_=0)
+    box(p, M["alu"], 0.06, 0.02, 3.2, face + 0.03, 0.95, 1.3, round_=0.003)
+    for col in range(3):
+        z0 = 2.9 - col * 3.2 / 3
+        box(p, M["bezel"], 0.002, 0.025, 0.35, face + 0.027, 1.92, z0 - 0.25, round_=0)
+        if col:
+            box(p, M["bezel"], 0.002, 0.92, 0.006, face + 0.027, 1.52, z0, round_=0)
+        for k in range((7, 4, 6)[col]):
+            row, c = divmod(k, 3)
+            box(p, M[rng.choice(("sticky_yellow", "sticky_pink", "sticky_green", "sticky_blue"))], 0.004, 0.2, 0.22, face + 0.029, 1.72 - row * 0.25, z0 - 0.21 - c * 0.32, round_=0)
+    box(p, M["walnut"], 0.02, 1.1, 1.45, face + 0.01, 1.55, -1.325, round_=0.004)
+    box(p, M["cork"], 0.006, 1.04, 1.39, face + 0.023, 1.55, -1.325, round_=0)
+    for y, z, h, w in ((1.7, -0.93, 0.55, 0.42), (1.79, -1.42, 0.42, 0.36), (1.3, -1.42, 0.4, 0.36), (1.62, -1.81, 0.68, 0.28)):
+        box(p, M["paper"], 0.003, h, w, face + 0.027, y, z, round_=0)
+        box(p, M["fire_red"], 0.01, 0.02, 0.02, face + 0.031, y + h / 2 - 0.04, z, round_=0)
+    for mat, r, depth, x in (("bezel", 0.17, 0.04, face + 0.02), ("ceramic", 0.15, 0.01, face + 0.042)):
+        dial = cyl(p, M[mat], r, depth, x, 1.82, -2.75, verts=32)
+        dial.rotation_euler = (0, math.radians(90), 0)
+    box(p, M["bezel"], 0.004, 0.11, 0.012, face + 0.049, 1.875, -2.75, round_=0)
+    box(p, M["bezel"], 0.004, 0.012, 0.08, face + 0.049, 1.82, -2.79, round_=0)
+    box(p, M["oak"], 0.45, 0.7, 0.9, face + 0.225, 0.37, -2.75, round_=0.006)
+    box(p, M["walnut"], 0.002, 0.6, 0.004, face + 0.451, 0.38, -2.75, round_=0)
+    for z in (-2.71, -2.79):
+        box(p, M["steel"], 0.02, 0.12, 0.012, face + 0.46, 0.5, z, round_=0)
+    box(p, M["walnut"], 0.47, 0.03, 0.92, face + 0.225, 0.735, -2.75, round_=0.004)
+    cyl(p, M["ceramic"], 0.04, 0.1, face + 0.3, 0.8, -2.42, verts=16)
+    cyl(p, M["fire_red"], 0.04, 0.1, face + 0.2, 0.8, -2.55, verts=16)
+    cyl(p, M["pot"], 0.09, 0.16, face + 0.25, 0.83, -3.0, verts=16)
+    for dy, dz, r in ((0.17, 0, 0.13), (0.1, 0.08, 0.1), (0.12, -0.07, 0.1)):
+        blob(p, M["leaf" if dz else "leaf_light"], r, face + 0.25, 0.83 + dy, -3.0 + dz, squash=0.8)
+    block(p, -0.08, 0.08, -length / 2, length / 2)
+    block(p, face, face + 0.47, -3.21, -2.29)
+
+
+def feature_gallery():
+    """A freestanding wall 6.8 m long along z painted deep green, with framed prints under picture lights, a bench and a
+    floor plant on its +x face. Origin at its middle on the floor. Markers: block."""
+    p = piece("feature_gallery")
+    length, height, face = 6.6, 2.5, 0.06
+    box(p, M["bezel"], 0.14, 0.1, length, 0, 0.05, 0, round_=0)
+    box(p, M["gallery_paint"], 0.12, height - 0.1, length, 0, height / 2 + 0.05, 0, round_=0.01)
+    box(p, M["walnut"], 0.16, 0.03, length + 0.04, 0, height + 0.015, 0, round_=0.006)
+    # (left, bottom, width, height) as seen from the desks, left at +z; then the print's ground, band and sun.
+    frames = (
+        (0.55, 1.0, 0.75, 1.0, "paper", "foos_blue", "bean_orange"),
+        (1.45, 1.55, 0.55, 0.5, "foos_blue", "paper", None),
+        (1.45, 1.0, 0.55, 0.42, "bean_orange", "bezel", None),
+        (2.15, 1.05, 1.15, 0.85, "sage", "tt_green", "paper"),
+        (3.45, 1.5, 0.5, 0.55, "sage", "fire_red", None),
+        (3.45, 1.0, 0.5, 0.38, "coat_navy", "bean_orange", None),
+        (4.1, 1.0, 0.9, 1.05, "coat_camel", "walnut", "fire_red"),
+        (5.15, 1.5, 0.6, 0.5, "tt_green", "bean_orange", None),
+        (5.15, 1.0, 0.6, 0.38, "paper", "foos_blue", None),
+    )
+    for i, (left, bottom, w, h, ground, band, sun) in enumerate(frames):
+        z, y = length / 2 + 0.1 - left - w / 2, bottom + h / 2
+        m = min(w, h) * 0.17
+        pw, ph = w - 2 * m, h - 2 * m
+        box(p, M["oak" if i % 3 == 1 else "bezel"], 0.03, h, w, face + 0.015, y, z, round_=0.003)
+        box(p, M["paper"], 0.004, h - 0.07, w - 0.07, face + 0.031, y, z, round_=0)
+        box(p, M[ground], 0.003, ph, pw, face + 0.034, y, z, round_=0)
+        if sun:
+            box(p, M[band], 0.003, ph * 0.35, pw, face + 0.037, bottom + m + ph * 0.175, z, round_=0)
+            dot = cyl(p, M[sun], min(pw, ph) * 0.16, 0.003, face + 0.037, bottom + m + ph * 0.66, z + pw * (0.2 if i else -0.2), verts=32)
+            dot.rotation_euler = (0, math.radians(90), 0)
+            box(p, M["brass"], 0.06, 0.03, 0.3, face + 0.09, bottom + h + 0.085, z, round_=0.005)
+            box(p, M["brass"], 0.06, 0.012, 0.012, face + 0.03, bottom + h + 0.085, z, round_=0)
+        elif i % 3 == 1:
+            box(p, M[band], 0.003, ph * 0.4, pw, face + 0.037, bottom + m + ph * 0.2, z, round_=0)
+        else:
+            box(p, M[band], 0.003, ph, pw / 2, face + 0.037, y, z - pw / 4, round_=0)
+    box(p, M["oak"], 0.4, 0.05, 3.9, face + 0.29, 0.435, -0.05, round_=0.008)
+    for z in (1.75, -0.05, -1.8):
+        box(p, M["steel"], 0.34, 0.41, 0.04, face + 0.29, 0.205, z, round_=0.004)
+    pot = piece("feature_gallery_plant")
+    pot.parent = p
+    pot.location = to_blender(face + 0.45, 0, -2.85)
+    plant_parts(pot, 0.2, 0.42, [(0, 1.15, 0, 0.3), (0.15, 0.95, 0.08, 0.24), (-0.14, 1.0, -0.06, 0.25), (0.05, 0.8, -0.18, 0.2), (-0.08, 1.35, 0.1, 0.2)])
+    cyl(pot, M["trunk"], 0.025, 0.7, 0, 0.75, 0, verts=8)
+    block(p, -0.08, 0.08, -length / 2, length / 2)
+    block(p, face + 0.08, face + 0.5, -2.05, 1.95)
+    block(p, face + 0.2, face + 0.7, -3.15, -2.55)
+
+
+def feature_shelf():
+    """Freestanding open oak shelving 6.8 m long along z, 0.4 m deep and 2.3 m high: six bays of five shelves with books,
+    small plants and pots, open to both sides. Origin at its middle on the floor. Markers: block."""
+    p = piece("feature_shelf")
+    length, height, deep, bays = 6.8, 2.3, 0.4, 6
+    rng = random.Random(11)
+    bay = length / bays
+    for n in range(bays + 1):
+        box(p, M["oak"], deep, height, 0.03, 0, height / 2, -length / 2 + n * bay, round_=0.004)
+    levels = [0.08 + i * 0.44 for i in range(6)]
+    for y in levels:
+        box(p, M["oak"], deep, 0.03, length, 0, y, 0, round_=0.004)
+    books = ("walnut", "sage", "fire_red", "foos_blue", "bean_orange", "paper", "coat_camel", "coat_navy", "tt_green", "upholstery")
+    for b in range(bays):
+        z0 = -length / 2 + b * bay + 0.03
+        for y in levels[:-1]:
+            base = y + 0.015
+            pick = rng.random()
+            if pick < 0.15:
+                continue
+            if pick < 0.3:
+                pz = z0 + rng.uniform(0.25, bay - 0.25)
+                cyl(p, M["pot"], 0.08, 0.14, 0, base + 0.07, pz, verts=16)
+                blob(p, M[rng.choice(("leaf", "leaf_light"))], 0.12, 0, base + 0.2, pz, squash=0.8)
+                continue
+            z = z0 + 0.03
+            end = z0 + (bay - 0.06) * rng.uniform(0.45, 0.9)
+            while z < end:
+                w = rng.uniform(0.025, 0.045)
+                h = rng.uniform(0.2, 0.32)
+                box(p, M[rng.choice(books)], rng.uniform(0.16, 0.22), h, w, rng.uniform(-0.03, 0.03), base + h / 2, z + w / 2, round_=0)
+                z += w + 0.004
+            if pick > 0.8 and end < z0 + bay - 0.25:
+                r = rng.uniform(0.05, 0.08)
+                cyl(p, M["ceramic"], r, rng.uniform(0.12, 0.24), 0, base + 0.09, (end + z0 + bay - 0.03) / 2, verts=16)
+    block(p, -deep / 2, deep / 2, -length / 2, length / 2)
+
+
+def feature_display():
+    """Freestanding open oak shelving like feature_shelf, holding team things instead of mostly books: trophies, framed
+    photos, board games, Lego, plants and vases. Origin at its middle on the floor. Markers: block."""
+    p = piece("feature_display")
+    length, height, deep, bays = 6.8, 2.3, 0.4, 6
+    rng = random.Random(13)
+    bay = length / bays
+    for n in range(bays + 1):
+        box(p, M["oak"], deep, height, 0.03, 0, height / 2, -length / 2 + n * bay, round_=0.004)
+    levels = [0.08 + i * 0.44 for i in range(6)]
+    for y in levels:
+        box(p, M["oak"], deep, 0.03, length, 0, y, 0, round_=0.004)
+    books = ("walnut", "sage", "fire_red", "foos_blue", "bean_orange", "paper", "coat_camel", "coat_navy", "tt_green", "upholstery")
+
+    def trophy(base, z, facing):
+        box(p, M["bezel"], 0.12, 0.04, 0.12, 0, base + 0.02, z, round_=0.004)
+        cyl(p, M["brass"], 0.012, 0.08, 0, base + 0.08, z, verts=10)
+        cyl(p, M["brass"], 0.03, 0.12, 0, base + 0.18, z, verts=16, r_top=0.065)
+
+    def photo(base, z, facing):
+        box(p, M["bezel"], 0.02, 0.26, 0.2, facing * 0.05, base + 0.13, z, round_=0.003)
+        box(p, M[rng.choice(("paper", "sage", "foos_blue"))], 0.004, 0.2, 0.14, facing * 0.061, base + 0.13, z, round_=0)
+
+    def games(base, z, facing):
+        for k, mat in enumerate(("fire_red", "foos_blue", "panel_reset")):
+            box(p, M[mat], 0.3, 0.055, 0.42 - k * 0.03, 0, base + 0.03 + k * 0.057, z, round_=0.003)
+
+    def plant(base, z, facing):
+        cyl(p, M["pot"], 0.075, 0.13, 0, base + 0.065, z, verts=16)
+        blob(p, M[rng.choice(("leaf", "leaf_light"))], 0.12, 0, base + 0.2, z, squash=0.8)
+
+    def lego(base, z, facing):
+        box(p, M["foos_blue"], 0.16, 0.08, 0.26, 0, base + 0.04, z, round_=0)
+        box(p, M["fire_red"], 0.12, 0.08, 0.18, 0, base + 0.12, z, round_=0)
+        box(p, M["panel_reset"], 0.08, 0.1, 0.1, 0, base + 0.21, z, round_=0)
+
+    def vase(base, z, facing):
+        r, h = rng.uniform(0.05, 0.08), rng.uniform(0.14, 0.26)
+        cyl(p, M[rng.choice(("ceramic", "sage", "bean_orange"))], r, h, 0, base + h / 2, z, verts=16)
+
+    things = (trophy, photo, games, plant, lego, vase)
+    for b in range(bays):
+        z0 = -length / 2 + b * bay + 0.03
+        room = bay - 0.06
+        for li, y in enumerate(levels[:-1]):
+            base = y + 0.015
+            facing = 1 if (b + li) % 2 else -1
+            pick = rng.random()
+            if pick < 0.1:
+                continue
+            if pick < 0.5:
+                z = z0 + 0.03
+                end = z0 + room * rng.uniform(0.3, 0.45)
+                while z < end:
+                    w = rng.uniform(0.025, 0.045)
+                    h = rng.uniform(0.2, 0.32)
+                    box(p, M[rng.choice(books)], rng.uniform(0.16, 0.22), h, w, rng.uniform(-0.03, 0.03), base + h / 2, z + w / 2, round_=0)
+                    z += w + 0.004
+                rng.choice(things)(base, (end + z0 + room) / 2, facing)
+            else:
+                rng.choice(things)(base, z0 + room * 0.28, facing)
+                rng.choice(things)(base, z0 + room * 0.75, facing)
+    for b in (0, 4):
+        plant(levels[-1] + 0.015, -length / 2 + (b + 0.5) * bay, 1)
+    block(p, -deep / 2, deep / 2, -length / 2, length / 2)
+
+
+def chair_stack(p, x, z, count):
+    """Stacked upholstered chairs, seats toward -z."""
+    for sx in (-0.21, 0.21):
+        for sz in (-0.19, 0.19):
+            box(p, M["steel"], 0.024, 0.44, 0.024, x + sx, 0.22, z + sz, round_=0)
+    for k in range(count):
+        box(p, M["upholstery"], 0.46, 0.045, 0.44, x, 0.465 + k * 0.06, z, round_=0.01)
+    box(p, M["upholstery"], 0.46, 0.4 + (count - 1) * 0.06, 0.05, x, 0.69 + (count - 1) * 0.03, z + 0.24, round_=0.01)
+    block(p, x - 0.3, x + 0.3, z - 0.3, z + 0.32)
+
+
+def town_hall():
+    """The town hall, 12 x 12 m in the floor's corner, open on its two inner sides: three tiers of oak seating with
+    cushions in an L along the windows on -z and +x, facing a media wall set at 45 degrees with a big screen
+    ("hall_screen", painted by the scene) over a low stage, a lectern and a speaker either side. Spare chairs and
+    stools past the ends of the seating. Markers: block."""
+    p = piece("town_hall")
+    box(p, M["hall_carpet"], 11.65, 0.02, 11.65, 0.025, 0.01, -0.025, round_=0)
+
+    # Seating: 0.4 m risers, 0.9 m treads, each wing 8.8 m from the corner; steps at half the rise up both open ends.
+    # The two wings mirror each other across the corner's diagonal.
+    bz, bx, x_end, z_end = -5.8, 5.8, -3.0, 3.0
+    for k in range(3):
+        deep = 0.9 * (3 - k)
+        y = 0.2 + 0.4 * k
+        box(p, M["oak"], bx - x_end, 0.4, deep, (x_end + bx) / 2, y, bz + deep / 2, round_=0.008)
+        box(p, M["oak"], deep, 0.4, z_end - bz - deep, bx - deep / 2, y, (bz + deep + z_end) / 2, round_=0.008)
+        run = bx - deep - x_end
+        count = int(run // 1.5)
+        for n in range(count):
+            pad = M["upholstery" if k % 2 == 0 else "sage"]
+            along = (run - count * 1.5) / 2 + 0.75 + n * 1.5
+            box(p, pad, 1.42, 0.06, 0.5, x_end + along, 0.43 + 0.4 * k, bz + deep - 0.3, round_=0.02)
+            box(p, pad, 0.5, 0.06, 1.42, bx - deep + 0.3, 0.43 + 0.4 * k, z_end - along, round_=0.02)
+    seat = bz + 2.7
+    for j in range(6):
+        h = 0.2 * (j + 1)
+        box(p, M["oak"], 0.8, h, 0.45, x_end - 0.4, h / 2, seat - 0.45 * j - 0.225, round_=0.006)
+        box(p, M["oak"], 0.45, h, 0.8, -seat + 0.45 * j + 0.225, h / 2, z_end + 0.4, round_=0.006)
+    # A rail along both windows, 0.9 m over the top tier.
+    for x in (x_end - 0.75, -0.2, 2.6):
+        box(p, M["steel"], 0.04, 0.9, 0.04, x, 1.65, bz + 0.05, round_=0.004)
+        box(p, M["steel"], 0.04, 0.9, 0.04, bx - 0.05, 1.65, -x, round_=0.004)
+    box(p, M["steel"], 0.04, 0.9, 0.04, bx - 0.05, 1.65, bz + 0.05, round_=0.004)
+    box(p, M["steel"], bx - x_end + 0.8, 0.05, 0.05, (x_end - 0.8 + bx) / 2, 2.1, bz + 0.05, round_=0.006)
+    box(p, M["steel"], 0.05, 0.05, z_end + 0.8 - bz, bx - 0.05, 2.1, (bz + z_end + 0.8) / 2, round_=0.006)
+    block(p, x_end - 0.8, bx, bz, seat)
+    block(p, bx - 2.7, bx, seat, z_end + 0.8)
+
+    # Media wall across the corner: charcoal toward the seats with the screen, oak slats on the back. Laid out
+    # along the wall (u) and out from it toward the seats (v).
+    cx, cz, turn, r = -2.5, 2.5, -math.pi / 4, math.sqrt(0.5)
+
+    def at(u, v):
+        return cx + (u + v) * r, cz + (u - v) * r
+
+    ww, wh = 8.0, 3.1
+    x, z = at(0, 0)
+    box(p, M["media_wall"], ww, wh, 0.2, x, wh / 2, z, turn, round_=0.01)
+    for n in range(40):
+        x, z = at(-ww / 2 + 0.1 + n * 0.2, -0.115)
+        box(p, M["oak"], 0.07, wh - 0.1, 0.03, x, wh / 2, z, turn, round_=0)
+    x, z = at(0, 0.125)
+    box(p, M["bezel"], 3.7, 2.12, 0.05, x, 1.95, z, turn, round_=0.01)
+    x, z = at(0, 0.152)
+    face_plane(p, M["hall_screen"], 3.6, 2.025, x, 1.95, z, -1, turn=3 * math.pi / 4)
+    # Stage, lectern with a gooseneck mic, and a speaker on a stand either side.
+    x, z = at(0, 1.0)
+    box(p, M["print_carpet"], 6.4, 0.2, 1.8, x, 0.1, z, turn, round_=0.01)
+    x, z = at(-2.4, 1.15)
+    box(p, M["walnut"], 0.6, 1.05, 0.45, x, 0.725, z, turn, round_=0.01)
+    box(p, M["bezel"], 0.64, 0.03, 0.5, x, 1.265, z, turn, round_=0.006)
+    x, z = at(-2.4, 1.33)
+    cyl(p, M["steel"], 0.006, 0.32, x, 1.44, z, verts=8)
+    cyl(p, M["bezel"], 0.018, 0.06, x, 1.62, z, verts=12)
+    for side in (-1, 1):
+        x, z = at(side * 3.8, 1.4)
+        cyl(p, M["steel"], 0.28, 0.02, x, 0.01, z, verts=16)
+        cyl(p, M["steel"], 0.02, 1.5, x, 0.77, z, verts=8)
+        box(p, M["bezel"], 0.34, 0.52, 0.3, x, 1.78, z, turn, round_=0.02)
+        x, z = at(side * 3.8, 1.555)
+        box(p, M["mesh"], 0.3, 0.48, 0.01, x, 1.78, z, turn, round_=0)
+    small_plant(p, "town_hall_plant_a", *at(-ww / 2 - 0.45, 0))
+    small_plant(p, "town_hall_plant_b", *at(ww / 2 + 0.45, 0))
+    # Blocks are square to the floor, so a run of small ones steps along the wall, stage and stands.
+    for n in range(13):
+        for v in (0.15, 0.85, 1.55):
+            x, z = at(-4.2 + n * 0.7, v)
+            block(p, x - 0.5, x + 0.5, z - 0.5, z + 0.5)
+
+    # Spare chairs stacked by the +x windows past the steps, stools by the -z windows past the other steps.
+    for z in (4.5, 5.15):
+        chair_stack(p, 5.3, z, 6)
+    for x in (-4.3, -4.95, -5.6):
+        cyl(p, M["oak"], 0.19, 0.44, x, 0.22, -5.45, verts=20)
+        cyl(p, M["upholstery"], 0.18, 0.04, x, 0.46, -5.45, verts=20)
+    block(p, -5.82, -4.08, -5.67, -5.23)
 
 
 def merge():
@@ -831,6 +1908,30 @@ kitchen()
 lift_core()
 lift_door()
 stairwell()
+toilets()
+wc_door("wc_door", 0.814, False)
+wc_door("wc_door_accessible", 0.914, True)
+cubicle_door()
+hand_dryer()
+tap()
+plant_room()
+breaker()
+server_room()
+server_rack()
+server_unit()
+breakout()
+printer()
+print_room()
+pod_door()
+phone_pods()
+locker_door()
+arrival_hub()
+feature_planter()
+feature_board()
+feature_gallery()
+feature_shelf()
+feature_display()
+town_hall()
 fire_door()
 ceiling_light()
 pod_screen()
