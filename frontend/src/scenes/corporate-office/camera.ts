@@ -89,8 +89,10 @@ export function cameraRig(camera: THREE.PerspectiveCamera, view: () => View, obs
     const step = (3.6 * dt) / Math.hypot(forward, side);
     const dx = (Math.sin(player.yaw) * forward - Math.cos(player.yaw) * side) * step;
     const dz = (Math.cos(player.yaw) * forward + Math.sin(player.yaw) * side) * step;
-    if (!blocked(player.x + dx, player.z)) player.x += dx;
-    if (!blocked(player.x, player.z + dz)) player.z += dz;
+    // A door can close on you; never leave you stuck in what it blocks.
+    const stuck = blocked(player.x, player.z);
+    if (stuck || !blocked(player.x + dx, player.z)) player.x += dx;
+    if (stuck || !blocked(player.x, player.z + dz)) player.z += dz;
   };
 
   return {
