@@ -40,6 +40,8 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
   const wrap = useRef<HTMLDivElement>(null);
   const [seated, setSeated] = useState(true);
   const [noclip, setNoclip] = useState(false);
+  // What the last frames cost to draw, to see what a change to the scene does to it.
+  const [stats, setStats] = useState({ triangles: 0, calls: 0, fps: 0 });
   const viewRef = useRef(view);
   viewRef.current = view;
   const nameRef = useRef(name);
@@ -79,6 +81,7 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
     let known: Set<string> | null = null;
     const rising = new Map<string, number>();
     let last = performance.now();
+    let counted = { since: performance.now(), frames: 0 };
     let raf = 0;
     const ray = new THREE.Raycaster();
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 800);
@@ -112,6 +115,12 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
       floor?.stairDoor.update(now);
       rig.update(dt, now);
       renderer.render(world.scene, camera);
+      counted.frames++;
+      if (now - counted.since > 500) {
+        const { triangles, calls } = renderer.info.render;
+        setStats({ triangles, calls, fps: Math.round((counted.frames * 1000) / (now - counted.since)) });
+        counted = { since: now, frames: 0 };
+      }
       walkers.label(camera, element.clientWidth, element.clientHeight);
       npcs.move(dt, now);
       npcs.label(camera, element.clientWidth, element.clientHeight, now);
@@ -287,6 +296,9 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
         </button>
       )}
 
+      <p className="pointer-events-none absolute right-3 bottom-3 rounded-md bg-background/80 px-2 py-1 text-xs text-muted-foreground tabular-nums">
+        {stats.triangles.toLocaleString()} triangles · {stats.calls.toLocaleString()} draw calls · {stats.fps} fps
+      </p>
       <p className="pointer-events-none absolute bottom-3 left-3 rounded-md bg-background/80 px-2 py-1 text-xs text-muted-foreground">
         {view === 'bird'
           ? 'Drag to turn · scroll to zoom · click an agent'
