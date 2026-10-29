@@ -24,3 +24,10 @@ With it you can:
 - **Work in parallel.** Many jobs at once, each in its own git worktree with its own branch and PR.
 - **Stay in charge.** Allow tools, answer check-ins, sign off results and send PR review comments back, all in one place.
 - **See everything.** Follow any job live, see the whole pipeline in the Flow tab, or walk the floor.
+
+## Getting started
+
+Download the latest build from [Releases](https://github.com/rexchoppers/trellis/releases). Trellis needs [Claude Code](https://docs.anthropic.com/en/docs/claude-code) installed and logged in, plus `git` and `gh`.
+
+> [!NOTE]
+> Trellis isn't signed yet, so macOS will warn you the first time you open it. Right-click the app and choose **Open**, or run `xattr -cr /Applications/Trellis.app`.
