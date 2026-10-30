@@ -1,0 +1,12 @@
+{
+  "name": "trellis",
+  "owner": { "name": "rexchoppers", "url": "https://github.com/rexchoppers" },
+  "description": "Claude Code plugins for Trellis, the app that runs a team of Claude Code agents as an office.",
+  "plugins": [
+    {
+      "name": "trellis",
+      "source": "./plugins/trellis",
+      "description": "Write Trellis agents: asks what the agent does, fits it into your teams and hand-offs, and writes the file in Trellis's house shape."
+    }
+  ]
+}

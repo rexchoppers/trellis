@@ -1,0 +1,9 @@
+{
+  "name": "trellis",
+  "description": "Write Trellis agents: asks what the agent does, fits it into your teams and hand-offs, and writes the file in Trellis's house shape.",
+  "author": { "name": "rexchoppers" },
+  "homepage": "https://github.com/rexchoppers/trellis",
+  "repository": "https://github.com/rexchoppers/trellis",
+  "license": "MIT",
+  "keywords": ["trellis", "agents", "claude-code", "multi-agent"]
+}
