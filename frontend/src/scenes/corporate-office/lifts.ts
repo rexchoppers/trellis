@@ -29,7 +29,7 @@ const anyFloor = (not: number) => {
 };
 
 // Two lifts that roam the building, counting floors on their displays. Now and then one stops at
-// your floor, chimes and opens. The call button brings the nearest one.
+// your floor and opens. The call button brings the nearest one.
 export function lifts(parent: THREE.Object3D, core: THREE.Vector3) {
   const group = new THREE.Group();
   parent.add(group);
@@ -53,30 +53,6 @@ export function lifts(parent: THREE.Object3D, core: THREE.Vector3) {
   button.position.set(core.x, 1.15, core.z + 2.024);
   group.add(button);
   let called = false;
-
-  let audio: AudioContext | undefined;
-  // Browsers only allow sound after the person has interacted with the page.
-  const unlock = () => {
-    audio ??= new AudioContext();
-  };
-  window.addEventListener('pointerdown', unlock, { once: true });
-  const chime = () => {
-    if (!audio) return;
-    for (const [freq, at] of [
-      [988, 0],
-      [784, 0.32],
-    ]) {
-      const osc = audio.createOscillator();
-      const gain = audio.createGain();
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.0001, audio.currentTime + at);
-      gain.gain.exponentialRampToValueAtTime(0.08, audio.currentTime + at + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audio.currentTime + at + 0.9);
-      osc.connect(gain).connect(audio.destination);
-      osc.start(audio.currentTime + at);
-      osc.stop(audio.currentTime + at + 1);
-    }
-  };
 
   const paint = (lift: Lift) => {
     const arrow = lift.phase === 'moving' ? (lift.target > lift.floor ? '▲' : '▼') : '';
@@ -105,7 +81,6 @@ export function lifts(parent: THREE.Object3D, core: THREE.Vector3) {
       lift.phase = 'opening';
       lift.answering = false;
       called = false;
-      chime();
     } else {
       lift.phase = 'stopped';
       lift.until = now + (lift.answering ? 1500 : 2000 + Math.random() * 10000);
@@ -180,8 +155,6 @@ export function lifts(parent: THREE.Object3D, core: THREE.Vector3) {
     },
     update,
     dispose: () => {
-      window.removeEventListener('pointerdown', unlock);
-      void audio?.close();
       group.traverse((object) => {
         if (object instanceof THREE.Mesh && !object.userData.kit) {
           object.geometry.dispose();
