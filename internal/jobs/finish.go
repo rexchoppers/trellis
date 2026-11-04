@@ -15,11 +15,16 @@ func (m *Manager) Finish(root, id, outcome string) error {
 
 // by is the finishing agent's name, or empty when the human finished the job.
 func (m *Manager) finish(root, id, outcome, by string) error {
+	release, claimed := beginOperation(root, id, true)
+	if !claimed {
+		return nil
+	}
+	defer release()
 	job, err := Load(root, id)
 	if err != nil {
 		return err
 	}
-	if job.State == Done || job.State == Cancelled {
+	if job.Over() {
 		return nil
 	}
 	d, agent, err := findAgent(root, job.Department, job.Agent)
@@ -126,6 +131,19 @@ func (m *Manager) sendBack(root string, job Job, agent config.Agent, outcome con
 
 // reopen starts a finished job again in its own session and worktree, with entry on its thread and text as the agent's next message.
 func (m *Manager) reopen(root string, origin Job, entry Entry, text string) error {
+	release, ok := beginOperation(root, origin.ID, false)
+	if !ok {
+		return errors.New("This job is finishing")
+	}
+	defer release()
+	current, err := Load(root, origin.ID)
+	if err != nil {
+		return err
+	}
+	if !current.Over() {
+		return errors.New("This job is already open")
+	}
+	origin = current
 	d, back, err := findAgent(root, origin.Department, origin.Agent)
 	if err != nil {
 		return err
@@ -198,11 +216,16 @@ func (m *Manager) publish(root string, job Job, d config.Department, agent confi
 }
 
 func (m *Manager) Cancel(root, id string) error {
+	release, claimed := beginOperation(root, id, true)
+	if !claimed {
+		return nil
+	}
+	defer release()
 	job, err := Load(root, id)
 	if err != nil {
 		return err
 	}
-	if job.State == Done || job.State == Cancelled {
+	if job.Over() {
 		return nil
 	}
 	if l := m.liveJob(id); l != nil {
@@ -225,7 +248,9 @@ func (m *Manager) dropWorktree(root string, job Job) {
 		m.note(root, job.ID, "Kept the worktree at "+job.Worktree+": it has uncommitted changes.")
 		return
 	}
-	removeWorktree(root, job.Worktree)
+	if err := removeWorktree(root, job.Worktree); err != nil {
+		m.note(root, job.ID, "Couldn't remove the worktree at "+job.Worktree+": "+err.Error())
+	}
 }
 
 func lastCheckIn(root, id string) string {

@@ -60,7 +60,11 @@ func (m *Manager) permission(l *live, tool string, input json.RawMessage) string
 	l.mu.Lock()
 	l.waits[entry.ID] = wait
 	l.mu.Unlock()
-	_, _ = m.update(l.root, l.id, func(j *Job) { j.State, j.Reason = NeedsYou, ForPermission })
+	_, _ = m.update(l.root, l.id, func(j *Job) {
+		if !j.Over() {
+			j.State, j.Reason = NeedsYou, ForPermission
+		}
+	})
 	m.changed(l.root, l.id)
 
 	decision := <-wait

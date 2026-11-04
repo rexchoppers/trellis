@@ -204,7 +204,11 @@ func (m *Manager) onFinish(l *live, args json.RawMessage) (string, error) {
 	_, _ = m.update(l.root, l.id, func(j *Job) { j.Outcome, j.Data = outcome.Name, in.Data })
 	m.say(l.root, l.id, Entry{From: "agent", Kind: "check_in", Text: summary, Outcome: outcome.Name, Data: in.Data})
 	if outcome.Confirm {
-		_, _ = m.update(l.root, l.id, func(j *Job) { j.State, j.Reason = NeedsYou, ForCheckIn })
+		_, _ = m.update(l.root, l.id, func(j *Job) {
+			if !j.Over() {
+				j.State, j.Reason = NeedsYou, ForCheckIn
+			}
+		})
 		m.changed(l.root, l.id)
 		return "Proposed. This outcome needs the human: end your turn now; they will finish the job or reply.", nil
 	}
@@ -247,7 +251,11 @@ func (m *Manager) onCheckIn(l *live, args json.RawMessage) (string, error) {
 	m.say(l.root, l.id, Entry{From: "agent", Kind: "check_in", Text: summary, Outcome: outcome, Data: in.Data})
 	m.tellParent(l.root, l.id, "checked in: "+summary)
 	if last {
-		_, _ = m.update(l.root, l.id, func(j *Job) { j.State, j.Reason = NeedsYou, ForCheckIn })
+		_, _ = m.update(l.root, l.id, func(j *Job) {
+			if !j.Over() {
+				j.State, j.Reason = NeedsYou, ForCheckIn
+			}
+		})
 		m.changed(l.root, l.id)
 	}
 	return "The human has your summary. End your turn now; they will reply with feedback, mark the job done, or cancel it.", nil

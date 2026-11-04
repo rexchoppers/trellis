@@ -191,6 +191,11 @@ func (m *Manager) deliver(root, id string, entry Entry, text string) error {
 	if strings.TrimSpace(entry.Text) == "" {
 		return errors.New("Write a message first")
 	}
+	release, ok := beginOperation(root, id, false)
+	if !ok {
+		return errors.New("This job is finishing")
+	}
+	defer release()
 	job, err := Load(root, id)
 	if err != nil {
 		return err

@@ -117,7 +117,11 @@ func (m *Manager) line(l *live, raw []byte) {
 	case "assistant":
 		// Activity after a check-in: the agent took up a message that was waiting.
 		if job, err := Load(l.root, l.id); err == nil && job.State == NeedsYou && job.Reason == ForCheckIn {
-			_, _ = m.update(l.root, l.id, func(j *Job) { j.State, j.Reason = Working, "" })
+			_, _ = m.update(l.root, l.id, func(j *Job) {
+				if j.State == NeedsYou && j.Reason == ForCheckIn {
+					j.State, j.Reason = Working, ""
+				}
+			})
 			m.changed(l.root, l.id)
 		}
 		for _, it := range items {
@@ -191,7 +195,11 @@ func (m *Manager) line(l *live, raw []byte) {
 			last = "Stopped without a summary."
 		}
 		m.say(l.root, l.id, Entry{From: "agent", Kind: "check_in", Text: last})
-		_, _ = m.update(l.root, l.id, func(j *Job) { j.State, j.Reason = NeedsYou, ForCheckIn })
+		_, _ = m.update(l.root, l.id, func(j *Job) {
+			if !j.Over() {
+				j.State, j.Reason = NeedsYou, ForCheckIn
+			}
+		})
 		m.changed(l.root, l.id)
 	}
 }
