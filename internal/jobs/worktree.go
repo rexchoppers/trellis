@@ -121,6 +121,7 @@ func openPR(dir, branch, base, title, body string) (string, error) {
 	return lines[len(lines)-1], nil
 }
 
-func removeWorktree(root, dir string) {
-	_, _ = git(root, "worktree", "remove", "--force", dir)
+func removeWorktree(root, dir string) error {
+	_, err := git(root, "worktree", "remove", "--force", dir)
+	return err
 }

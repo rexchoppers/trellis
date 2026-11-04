@@ -9,6 +9,15 @@ import (
 )
 
 func (m *Manager) freshSession(root, id, handover string) {
+	release, ok := beginOperation(root, id, false)
+	if !ok {
+		return
+	}
+	defer release()
+	current, err := Load(root, id)
+	if err != nil || current.Over() {
+		return
+	}
 	if l := m.liveJob(id); l != nil {
 		m.stop(l)
 	}
@@ -78,6 +87,15 @@ func (m *Manager) tellParent(root, id, what string) {
 }
 
 func (m *Manager) rest(root, id, handover string) {
+	release, ok := beginOperation(root, id, false)
+	if !ok {
+		return
+	}
+	defer release()
+	current, err := Load(root, id)
+	if err != nil || current.Over() {
+		return
+	}
 	if l := m.liveJob(id); l != nil {
 		m.stop(l)
 	}
@@ -128,6 +146,16 @@ func (m *Manager) tick() {
 }
 
 func (m *Manager) wake(root string, job Job, news string) {
+	release, ok := beginOperation(root, job.ID, false)
+	if !ok {
+		return
+	}
+	defer release()
+	current, err := Load(root, job.ID)
+	if err != nil || current.State != Waiting || m.liveJob(job.ID) != nil {
+		return
+	}
+	job = current
 	d, agent, err := findAgent(root, job.Department, job.Agent)
 	if err != nil {
 		m.note(root, job.ID, "Couldn't wake: "+err.Error())

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -59,6 +60,47 @@ func (m *Manager) changed(root, id string) {
 }
 
 var jobMu sync.Mutex
+
+type jobOperation struct {
+	mu      sync.Mutex
+	refs    int
+	closing bool
+}
+
+var operationMu sync.Mutex
+var operations = map[string]*jobOperation{}
+
+func beginOperation(root, id string, closing bool) (func(), bool) {
+	key := filepath.Join(root, id)
+	operationMu.Lock()
+	op := operations[key]
+	if op == nil {
+		op = &jobOperation{}
+		operations[key] = op
+	}
+	if op.closing {
+		operationMu.Unlock()
+		return nil, false
+	}
+	op.refs++
+	if closing {
+		op.closing = true
+	}
+	operationMu.Unlock()
+	op.mu.Lock()
+	return func() {
+		op.mu.Unlock()
+		operationMu.Lock()
+		if closing {
+			op.closing = false
+		}
+		op.refs--
+		if op.refs == 0 {
+			delete(operations, key)
+		}
+		operationMu.Unlock()
+	}, true
+}
 
 func (m *Manager) update(root, id string, change func(*Job)) (Job, error) {
 	jobMu.Lock()
