@@ -6,9 +6,13 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/rexchoppers/trellis/internal/config"
 )
+
+// How long a turn that ended on running background work waits for it before coming back to you anyway.
+const backgroundLimit = 30 * time.Minute
 
 var issueID = regexp.MustCompile(`\b[A-Z][A-Z0-9]+-\d+\b`)
 
@@ -76,6 +80,7 @@ func (m *Manager) line(l *live, raw []byte) {
 			Name   string `json:"name"`
 			Status string `json:"status"`
 		} `json:"mcp_servers"`
+		Tasks   []json.RawMessage `json:"tasks"`
 		Message struct {
 			Content json.RawMessage `json:"content"`
 		} `json:"message"`
@@ -99,6 +104,12 @@ func (m *Manager) line(l *live, raw []byte) {
 
 	switch event.Type {
 	case "system":
+		if event.Subtype == "background_tasks_changed" {
+			l.mu.Lock()
+			l.background = len(event.Tasks)
+			l.mu.Unlock()
+			return
+		}
 		if event.Subtype != "init" {
 			return
 		}
@@ -119,6 +130,9 @@ func (m *Manager) line(l *live, raw []byte) {
 			}
 		}
 	case "assistant":
+		if l.unpark() {
+			m.setDoing(l, "Thinking")
+		}
 		// Activity after a check-in: the agent took up a message that was waiting.
 		if job, err := Load(l.root, l.id); err == nil && job.State == NeedsYou && job.Reason == ForCheckIn {
 			_, _ = m.update(l.root, l.id, func(j *Job) {
@@ -167,9 +181,10 @@ func (m *Manager) line(l *live, raw []byte) {
 		}
 	case "result":
 		m.setDoing(l, "")
+		l.unpark()
 		l.mu.Lock()
 		l.turns = max(l.turns-1, 0)
-		more, checked, last, ending := l.turns > 0, l.checkedIn, l.lastText, l.ending
+		more, checked, last, ending, waiting := l.turns > 0, l.checkedIn, l.lastText, l.ending, l.background > 0
 		l.checkedIn, l.lastText = false, ""
 		if checked {
 			// Claude Code can take several waiting messages in one turn, so a check-in settles the count.
@@ -194,18 +209,46 @@ func (m *Manager) line(l *live, raw []byte) {
 		if more {
 			return
 		}
-		// The agent stopped without checking in: it still comes back to you.
-		if last == "" {
-			last = "Stopped without a summary."
+		// Claude Code starts a new turn when the background work ends, so the agent hasn't stopped.
+		if waiting {
+			m.setDoing(l, "Waiting on background work")
+			l.mu.Lock()
+			l.parked = time.AfterFunc(backgroundLimit, func() {
+				if l.unpark() && m.liveJob(l.id) == l {
+					m.setDoing(l, "")
+					m.stopped(l, last)
+				}
+			})
+			l.mu.Unlock()
+			return
 		}
-		m.say(l.root, l.id, Entry{From: "agent", Kind: "check_in", Text: last})
-		_, _ = m.update(l.root, l.id, func(j *Job) {
-			if !j.Over() {
-				j.State, j.Reason = NeedsYou, ForCheckIn
-			}
-		})
-		m.changed(l.root, l.id)
+		m.stopped(l, last)
 	}
+}
+
+// The agent stopped without checking in: it still comes back to you.
+func (m *Manager) stopped(l *live, last string) {
+	if last == "" {
+		last = "Stopped without a summary."
+	}
+	m.say(l.root, l.id, Entry{From: "agent", Kind: "check_in", Text: last})
+	_, _ = m.update(l.root, l.id, func(j *Job) {
+		if !j.Over() {
+			j.State, j.Reason = NeedsYou, ForCheckIn
+		}
+	})
+	m.changed(l.root, l.id)
+}
+
+func (l *live) unpark() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if l.parked == nil {
+		return false
+	}
+	l.parked.Stop()
+	l.parked = nil
+	return true
 }
 
 func resultText(content json.RawMessage) string {

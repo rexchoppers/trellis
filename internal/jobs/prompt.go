@@ -28,6 +28,7 @@ func args(job Job, d config.Department, agent config.Agent, mcpConfig string) []
 	if agent.Every != "" {
 		stopping = "- End every check by calling rest. Call check_in only when the human must step in."
 	}
+	stopping += "\n- Waiting on a background command is not stopping: end your turn without check_in or rest. You are woken when it finishes."
 	system := strings.TrimSpace(agent.Prompt) + fmt.Sprintf(`
 
 ## Working in Trellis

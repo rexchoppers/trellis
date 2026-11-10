@@ -90,7 +90,7 @@ type Entry struct {
 	ID   int       `json:"id"`
 	At   time.Time `json:"at"`
 	From string    `json:"from"` // you, agent, trellis, parent, child
-	// task, message, done, cancelled (you); text, thinking, step, check_in, session (agent); permission, refused, note, event, sent (trellis); message (parent, child)
+	// task, message, done, cancelled (you); text, thinking, step, check_in, report, session (agent); permission, refused, note, event, sent (trellis); message (parent, child)
 	Kind     string            `json:"kind"`
 	By       string            `json:"by,omitempty"`
 	Text     string            `json:"text,omitempty"`

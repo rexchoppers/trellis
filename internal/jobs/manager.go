@@ -44,6 +44,9 @@ type live struct {
 	lastText  string
 	calls     map[string]call
 	reported  bool
+	// Background tasks running in the session, and the timer for a turn that ended while they ran.
+	background int
+	parked     *time.Timer
 	// Set once the agent called fresh_session, rest, or finish with an outcome the human needn't confirm: this session is on its way out.
 	ending bool
 }

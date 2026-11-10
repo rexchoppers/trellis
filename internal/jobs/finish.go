@@ -256,7 +256,7 @@ func (m *Manager) dropWorktree(root string, job Job) {
 func lastCheckIn(root, id string) string {
 	thread, _ := Thread(root, id)
 	for i := len(thread) - 1; i >= 0; i-- {
-		if thread[i].Kind == "check_in" {
+		if thread[i].Kind == "check_in" || thread[i].Kind == "report" {
 			return thread[i].Text
 		}
 	}

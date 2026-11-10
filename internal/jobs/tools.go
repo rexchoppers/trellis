@@ -202,7 +202,11 @@ func (m *Manager) onFinish(l *live, args json.RawMessage) (string, error) {
 	l.checkedIn, l.ending = true, !outcome.Confirm
 	l.mu.Unlock()
 	_, _ = m.update(l.root, l.id, func(j *Job) { j.Outcome, j.Data = outcome.Name, in.Data })
-	m.say(l.root, l.id, Entry{From: "agent", Kind: "check_in", Text: summary, Outcome: outcome.Name, Data: in.Data})
+	kind := "report"
+	if outcome.Confirm {
+		kind = "check_in"
+	}
+	m.say(l.root, l.id, Entry{From: "agent", Kind: kind, Text: summary, Outcome: outcome.Name, Data: in.Data})
 	if outcome.Confirm {
 		_, _ = m.update(l.root, l.id, func(j *Job) {
 			if !j.Over() {

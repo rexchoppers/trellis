@@ -53,7 +53,7 @@ export function group(thread: jobs.Entry[]): Group[] {
       // Said after a check-in in the same turn, it repeats the check-in.
       if (checkedIn) folded.add(entry.id);
       else turn.push(entry.id);
-    } else if (entry.kind === 'check_in') {
+    } else if (entry.kind === 'check_in' || entry.kind === 'report') {
       turn.forEach((id) => folded.add(id));
       turn = [];
       checkedIn = true;

@@ -140,15 +140,16 @@ export function ThreadEntry({
         </details>
       );
     case 'check_in':
+    case 'report':
       return (
         <div className="flex flex-col gap-1.5">
           <Label>
-            {name} · checked in · {time(e.at)}
+            {name} · {e.kind === 'report' ? 'summary' : 'checked in'} · {time(e.at)}
           </Label>
           <div className="border bg-card px-3.5 py-3">
             <Markdown text={e.text ?? ''} />
           </div>
-          {e.outcome && <Label>Proposes: {outcomes.find((o) => o.name === e.outcome)?.label ?? e.outcome}</Label>}
+          {e.kind === 'check_in' && e.outcome && <Label>Proposes: {outcomes.find((o) => o.name === e.outcome)?.label ?? e.outcome}</Label>}
         </div>
       );
     case 'event':
