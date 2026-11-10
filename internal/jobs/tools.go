@@ -199,7 +199,7 @@ func (m *Manager) onFinish(l *live, args json.RawMessage) (string, error) {
 		}
 	})
 	l.mu.Lock()
-	l.checkedIn = true
+	l.checkedIn, l.ending = true, !outcome.Confirm
 	l.mu.Unlock()
 	_, _ = m.update(l.root, l.id, func(j *Job) { j.Outcome, j.Data = outcome.Name, in.Data })
 	m.say(l.root, l.id, Entry{From: "agent", Kind: "check_in", Text: summary, Outcome: outcome.Name, Data: in.Data})
@@ -215,6 +215,15 @@ func (m *Manager) onFinish(l *live, args json.RawMessage) (string, error) {
 	afterReply(func() {
 		if err := m.finish(l.root, l.id, outcome.Name, l.agent.Name); err != nil {
 			m.note(l.root, l.id, "Couldn't finish the job: "+err.Error())
+			l.mu.Lock()
+			l.ending = false
+			l.mu.Unlock()
+			_, _ = m.update(l.root, l.id, func(j *Job) {
+				if !j.Over() {
+					j.State, j.Reason = NeedsYou, ForCheckIn
+				}
+			})
+			m.changed(l.root, l.id)
 		}
 	})
 	return "Finished. End your turn now.", nil

@@ -44,7 +44,7 @@ type live struct {
 	lastText  string
 	calls     map[string]call
 	reported  bool
-	// Set once the agent called fresh_session or rest: this session is on its way out.
+	// Set once the agent called fresh_session, rest, or finish with an outcome the human needn't confirm: this session is on its way out.
 	ending bool
 }
 
