@@ -110,7 +110,11 @@ func (m *Manager) line(l *live, raw []byte) {
 			return
 		}
 		for _, server := range event.MCPServers {
-			if server.Name != "trellis" && server.Status != "connected" {
+			switch {
+			case server.Name == "trellis" || server.Status == "connected":
+			case server.Status == "pending":
+				m.note(l.root, l.id, server.Name+" is still connecting.")
+			default:
 				m.note(l.root, l.id, fmt.Sprintf("%s did not connect (%s), so the agent can't use it.", server.Name, server.Status))
 			}
 		}
