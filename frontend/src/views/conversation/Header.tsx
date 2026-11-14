@@ -52,11 +52,14 @@ export function Header({ job, who, back, onClose, onOpenJob }: { job: jobs.Job; 
         {who.department} · <span className={cn(job.state === 'needs_you' && 'text-[var(--amber)]', job.state === 'working' && 'text-[var(--working)]')}>{stateLabel(job.state)}</span>
       </span>
       {job.parent ? (
-        <button type="button" className="justify-self-start text-left text-[13px] text-[#c9c9c2] hover:text-foreground" onClick={() => onOpenJob?.(job.parent!.job)}>
+        <button type="button" title={job.task} className="line-clamp-2 justify-self-start text-left text-[13px] break-words text-[#c9c9c2] hover:text-foreground" onClick={() => onOpenJob?.(job.parent!.job)}>
           Started by {job.parent.name} · {job.task} →
         </button>
       ) : (
-        <span className="text-[13px] text-[#c9c9c2]">{jobTitle(job)}</span>
+        // A pasted task can run to pages; unclamped it pushes the thread out of view.
+        <span title={jobTitle(job)} className="line-clamp-2 text-[13px] break-words text-[#c9c9c2]">
+          {jobTitle(job)}
+        </span>
       )}
       {(job.children ?? []).length > 0 && (
         <div className="flex flex-wrap gap-x-3 gap-y-1">
