@@ -71,6 +71,9 @@ export type Plan = {
   hub: THREE.Vector3;
   walls: { centre: THREE.Vector3; style: (typeof WALL_STYLES)[number]; rotationY: number; department: config.Department }[];
   walkways: THREE.Vector3[];
+  // The z of the aisle past your office and of the cross aisle between the rows.
+  aisle: number;
+  cross: number;
 };
 
 export const desksOf = (department: config.Department) =>
@@ -173,5 +176,7 @@ export function planFloor(departments: config.Department[], places: config.Place
     hub,
     walls,
     walkways,
+    aisle,
+    cross,
   };
 }

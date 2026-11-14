@@ -327,7 +327,7 @@ export function buildFloor(departments: config.Department[], places: config.Plac
   });
 
   shadows(group, new Set([...glass, ...noShadow, ...ceiling.children]));
-  decor?.finish(group, glassFronts(plan, [...meetings, { x0: print.x - 2.5, x1: print.x + 2.5 }]), walled);
+  decor?.finish(group, ceiling, glassFronts(plan, [...meetings, { x0: print.x - 2.5, x1: print.x + 2.5 }]), walled);
   return {
     group,
     plan,

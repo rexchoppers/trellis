@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { STOREY } from './build';
 import { along, stringLights } from './bulbs';
 import { reducedMotion } from './figure';
@@ -49,14 +50,121 @@ function tinsel(parent: THREE.Object3D, pod: THREE.Vector3, n: number) {
   );
 }
 
+const FOIL = [0xc9a24a, 0xb3262d, 0x2f7d4a, 0xc9ccd1, 0x3554b8];
+const BAUBLES = [0x9e1b2c, 0xc9a24a, 0x1f6b3a, 0xc9ccd1, 0x2a4fa8];
+const foils = new Map<number, THREE.Material>();
+const foil = (colour: number) => foils.get(colour) ?? foils.set(colour, new THREE.MeshStandardMaterial({ color: colour, metalness: 0.45, roughness: 0.3, side: THREE.DoubleSide })).get(colour)!;
+const ball = new THREE.SphereGeometry(1, 16, 12);
+const shiny = new THREE.MeshStandardMaterial({ metalness: 0.5, roughness: 0.22 });
+const twine = new THREE.LineBasicMaterial({ color: 0xbdbdbd });
+
+function starShape() {
+  const shape = new THREE.Shape();
+  for (let k = 0; k < 10; k++) {
+    const r = k % 2 ? 0.42 : 1;
+    const a = (k / 10) * Math.PI * 2;
+    if (k) shape.lineTo(Math.sin(a) * r, Math.cos(a) * r);
+    else shape.moveTo(0, r);
+  }
+  return new THREE.ExtrudeGeometry(shape, { depth: 0.18, bevelEnabled: false }).center();
+}
+const starGeometry = starShape();
+
+// A twisted foil garland: two strips crossed, turning as they go, hung in a swag from a to b.
+function streamer(a: THREE.Vector3, b: THREE.Vector3, sag: number) {
+  const at = (t: number) => a.clone().lerp(b, t).setY(THREE.MathUtils.lerp(a.y, b.y, t) - sag * 4 * t * (1 - t));
+  const length = a.distanceTo(b);
+  const n = Math.ceil(length / 0.03);
+  const up = new THREE.Vector3(0, 1, 0);
+  const positions: number[] = [];
+  let last: THREE.Vector3[][] | null = null;
+  for (let k = 0; k <= n; k++) {
+    const t = k / n;
+    const p = at(t);
+    const tangent = at(Math.min(1, t + 0.01)).sub(at(Math.max(0, t - 0.01))).normalize();
+    const side = new THREE.Vector3().crossVectors(tangent, up).normalize();
+    const lift = new THREE.Vector3().crossVectors(side, tangent);
+    const turn = t * length * 28;
+    const edges = [0, Math.PI / 2].map((extra) => {
+      const d = side.clone().multiplyScalar(Math.cos(turn + extra)).addScaledVector(lift, Math.sin(turn + extra)).multiplyScalar(0.055);
+      return [p.clone().add(d), p.clone().sub(d)];
+    });
+    if (last)
+      for (let r = 0; r < 2; r++) {
+        const [a0, a1] = last[r];
+        const [b0, b1] = edges[r];
+        for (const v of [a0, a1, b1, a0, b1, b0]) positions.push(v.x, v.y, v.z);
+      }
+    last = edges;
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 type Front = { x0: number; x1: number; z: number; look: 'warm' | 'multi' };
 
-// Everything festive that hangs on the floor: lights on the windows, glass fronts, lift core, reception and desks.
+// Everything festive that hangs on the floor: lights on the windows, glass fronts, lift core, reception and desks,
+// and foil garlands and baubles across the ceiling over the aisles.
 export function festiveFloor(plan: Plan) {
   const lights = stringLights();
   const calm = reducedMotion();
   const pods: { parent: THREE.Object3D; pod: THREE.Vector3 }[] = [];
+  const spin: { mesh: THREE.InstancedMesh | null; at: THREE.Vector3[]; turn: number[]; speed: number[]; size: number } = { mesh: null, at: [], turn: [], speed: [], size: 0.13 };
   let star: THREE.MeshStandardMaterial | undefined;
+  const matrix = new THREE.Matrix4();
+  const turn = new THREE.Quaternion();
+  const up = new THREE.Vector3(0, 1, 0);
+
+  const ceilingDecor = (ceiling: THREE.Object3D) => {
+    const top = STOREY - 0.02;
+    const chains: THREE.Vector3[][] = [];
+    // Zigzags along both aisles, and down the open line from your office to reception, clear of the cross aisle.
+    for (const lane of [plan.aisle, plan.cross]) chains.push(along(new THREE.Vector3(plan.x0 + 3, top, lane), new THREE.Vector3(plan.x1 - 3, top, lane), BAY).map((p, k) => p.setZ(lane + (k % 2 ? 1 : -1))));
+    const spine: THREE.Vector3[] = [];
+    for (let z = plan.aisle - 1.5; z > plan.reception.z + 4; z -= 3) {
+      if (Math.abs(z - plan.cross) < 1.5) {
+        chains.push(spine.splice(0));
+        continue;
+      }
+      spine.push(new THREE.Vector3(spine.length % 2 ? 1.2 : -1.2, top, z));
+    }
+    chains.push(spine);
+    const strips = new Map<number, THREE.BufferGeometry[]>();
+    const hung: { at: THREE.Vector3; size: number; colour: number }[] = [];
+    let n = 0;
+    for (const chain of chains)
+      chain.forEach((a, k) => {
+        hung.push({ at: a.clone().setY(top - (k % 2 ? 0.45 : 0.32)), size: k % 2 ? 0.1 : 0.08, colour: BAUBLES[(n + k) % BAUBLES.length] });
+        const b = chain[k + 1];
+        if (!b) return;
+        const colour = FOIL[n++ % FOIL.length];
+        strips.set(colour, [...(strips.get(colour) ?? []), streamer(a, b, 0.38)]);
+        spin.at.push(a.clone().lerp(b, 0.5).setY(top - 0.38 - 0.3));
+        spin.turn.push(Math.random() * Math.PI * 2);
+        spin.speed.push((Math.random() < 0.5 ? -1 : 1) * (0.3 + Math.random() * 0.4));
+      });
+    for (const [colour, geometries] of strips) {
+      ceiling.add(new THREE.Mesh(mergeGeometries(geometries), foil(colour)));
+      geometries.forEach((geometry) => geometry.dispose());
+    }
+    const baubles = new THREE.InstancedMesh(ball, shiny, hung.length);
+    baubles.userData.shared = true;
+    hung.forEach(({ at, size, colour }, i) => {
+      baubles.setMatrixAt(i, matrix.makeScale(size, size, size).setPosition(at));
+      baubles.setColorAt(i, new THREE.Color(colour));
+    });
+    const stars = new THREE.InstancedMesh(starGeometry, shiny, spin.at.length);
+    stars.userData.shared = true;
+    spin.at.forEach((at, i) => {
+      stars.setMatrixAt(i, matrix.compose(at, turn.setFromAxisAngle(up, spin.turn[i]), new THREE.Vector3().setScalar(spin.size)));
+      stars.setColorAt(i, new THREE.Color(i % 2 ? 0xc9ccd1 : 0xd8b45a));
+    });
+    spin.mesh = stars;
+    const threads = [...hung.map(({ at, size }) => [at.clone().setY(STOREY), at.clone().setY(at.y + size)]), ...spin.at.map((at) => [at.clone().setY(at.y + 0.3), at.clone().setY(at.y + spin.size)])].flat();
+    ceiling.add(baubles, stars, new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(threads), twine));
+  };
 
   const windows = (group: THREE.Object3D, walled: (x: number, z: number) => boolean) => {
     const { x0, x1, z0, z1 } = plan;
@@ -97,7 +205,7 @@ export function festiveFloor(plan: Plan) {
       });
     },
     // After the floor's shadows are set, so none of this casts any.
-    finish: (group: THREE.Object3D, fronts: Front[], walled: (x: number, z: number) => boolean) => {
+    finish: (group: THREE.Object3D, ceiling: THREE.Object3D, fronts: Front[], walled: (x: number, z: number) => boolean) => {
       const warm = { sag: 0.12, spacing: 0.1, size: 0.016, halo: 0.16 };
       windows(group, walled);
       for (const front of fronts) lights.hang(group, along(new THREE.Vector3(front.x0 + 0.05, 2.7, front.z), new THREE.Vector3(front.x1 - 0.05, 2.7, front.z), 1), front.look, front.look === 'warm' ? warm : { sag: 0.1, spacing: 0.2, size: 0.022, halo: 0.3 });
@@ -126,11 +234,19 @@ export function festiveFloor(plan: Plan) {
           look === 'warm' ? 0.02 : 0.026,
           look === 'warm' ? 0.16 : 0.26,
         );
+      ceilingDecor(ceiling);
     },
     update: (now: number) => {
       lights.update(now);
       if (calm) return;
-      if (star) star.emissiveIntensity = 0.8 + 0.6 * (0.5 + 0.5 * Math.sin((now / 1000) * 1.3));
+      const t = now / 1000;
+      const stars = spin.mesh;
+      if (stars) {
+        const size = new THREE.Vector3().setScalar(spin.size);
+        spin.at.forEach((at, i) => stars.setMatrixAt(i, matrix.compose(at, turn.setFromAxisAngle(up, spin.turn[i] + t * spin.speed[i]), size)));
+        stars.instanceMatrix.needsUpdate = true;
+      }
+      if (star) star.emissiveIntensity = 0.8 + 0.6 * (0.5 + 0.5 * Math.sin(t * 1.3));
     },
     dispose: () => lights.dispose(),
   };
