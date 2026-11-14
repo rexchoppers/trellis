@@ -124,6 +124,7 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
       floor?.stairDoor.update(now);
       floor?.fittings.update(now);
       floor?.servers.update(now, atDesk ? camera.position : null);
+      floor?.decor?.update(now);
       rig.update(dt, now);
       sky?.update(now, camera.position);
       renderer.render(world.scene, camera);

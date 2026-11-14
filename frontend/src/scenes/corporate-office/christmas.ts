@@ -1,10 +1,21 @@
 import * as THREE from 'three';
+import { STOREY } from './build';
+import { along, stringLights } from './bulbs';
 import { reducedMotion } from './figure';
 import { placeKit, type KitPiece } from './kit';
-import type { Plan } from './plan';
+import { BAY, OFFICE, type Plan } from './plan';
 
 // Past the reception counter's right end.
 const treeAt = (plan: Plan) => new THREE.Vector3(plan.reception.x + 5.6, 0, plan.reception.z + 1.4);
+// The tree's tiers as office.py builds them: base, radius and height of each cone.
+const TIERS = [
+  [0.5, 0.82, 0.72],
+  [0.88, 0.68, 0.64],
+  [1.24, 0.54, 0.58],
+  [1.58, 0.4, 0.52],
+  [1.9, 0.26, 0.5],
+];
+const treeRadius = (y: number) => Math.max(0, ...TIERS.filter(([base, , h]) => y >= base && y <= base + h).map(([base, r, h]) => r + ((0.02 - r) * (y - base)) / h));
 
 export function decorations(plan: Plan): { key: string; piece: KitPiece; centre: THREE.Vector3; rotationY?: number }[] {
   const { reception, core, breakout } = plan;
@@ -21,8 +32,8 @@ export function decorations(plan: Plan): { key: string; piece: KitPiece; centre:
 const TINSEL = [0xd8b45a, 0xc9ccd1, 0xb3262d];
 const tinted = new Map<number, THREE.Material>();
 
-export function tinsel(parent: THREE.Object3D, pod: THREE.Vector3, n: number) {
-  const colour = TINSEL[n % TINSEL.length];
+function tinsel(parent: THREE.Object3D, pod: THREE.Vector3, n: number) {
+  const colour = TINSEL[(n / 2) % TINSEL.length];
   placeKit(parent, 'xmas_tinsel', pod.x, pod.z, 0, undefined, (model) =>
     model.traverse((object) => {
       if (!(object instanceof THREE.Mesh) || (object.material as THREE.Material).name !== 'tinsel') return;
@@ -36,6 +47,103 @@ export function tinsel(parent: THREE.Object3D, pod: THREE.Vector3, n: number) {
       object.material = material;
     }),
   );
+}
+
+type Front = { x0: number; x1: number; z: number; look: 'warm' | 'multi' };
+
+// Everything festive that hangs on the floor: lights on the windows, glass fronts, lift core, reception and desks.
+export function festiveFloor(plan: Plan) {
+  const lights = stringLights();
+  const calm = reducedMotion();
+  const pods: { parent: THREE.Object3D; pod: THREE.Vector3 }[] = [];
+  let star: THREE.MeshStandardMaterial | undefined;
+
+  const windows = (group: THREE.Object3D, walled: (x: number, z: number) => boolean) => {
+    const { x0, x1, z0, z1 } = plan;
+    const across = Math.round((x1 - x0) / BAY);
+    const deep = Math.round((z1 - z0) / 3);
+    const y = STOREY - 0.12;
+    const row = (count: number, point: (u: number) => THREE.Vector3) => Array.from({ length: count + 1 }, (_, k) => point(k / count).setY(y));
+    // One run per wall, from mullion to mullion a little in from the glass, broken where a walled room stands.
+    for (const anchors of [
+      row(across, (u) => new THREE.Vector3(x0 + u * (x1 - x0), 0, z0 + 0.1)),
+      row(across, (u) => new THREE.Vector3(x0 + u * (x1 - x0), 0, z1 - 0.1)),
+      row(deep, (u) => new THREE.Vector3(x0 + 0.1, 0, z0 + u * (z1 - z0))),
+      row(deep, (u) => new THREE.Vector3(x1 - 0.1, 0, z0 + u * (z1 - z0))),
+    ]) {
+      let run: THREE.Vector3[] = [];
+      const flush = () => {
+        if (run.length > 1) lights.hang(group, run, 'multi', { sag: 0.2, spacing: 0.28, size: 0.03, halo: 0.45 });
+        run = [];
+      };
+      anchors.forEach((a, k) => {
+        const b = anchors[k + 1];
+        if (b && !walled((a.x + b.x) / 2, (a.z + b.z) / 2)) run.push(...(run.length ? [b] : [a, b]));
+        else flush();
+      });
+    }
+  };
+
+  return {
+    // Tinsel on every other desk pod and a string of coloured lights on the rest.
+    pod: (parent: THREE.Object3D, pod: THREE.Vector3, n: number) => {
+      if (n % 2) pods.push({ parent, pod });
+      else tinsel(parent, pod, n);
+    },
+    dress: (model: THREE.Object3D) => {
+      lights.fairy(model);
+      model.traverse((object) => {
+        if (object instanceof THREE.Mesh && (object.material as THREE.Material).name === 'star') star = object.material as THREE.MeshStandardMaterial;
+      });
+    },
+    // After the floor's shadows are set, so none of this casts any.
+    finish: (group: THREE.Object3D, fronts: Front[], walled: (x: number, z: number) => boolean) => {
+      const warm = { sag: 0.12, spacing: 0.1, size: 0.016, halo: 0.16 };
+      windows(group, walled);
+      for (const front of fronts) lights.hang(group, along(new THREE.Vector3(front.x0 + 0.05, 2.7, front.z), new THREE.Vector3(front.x1 - 0.05, 2.7, front.z), 1), front.look, front.look === 'warm' ? warm : { sag: 0.1, spacing: 0.2, size: 0.022, halo: 0.3 });
+      const { core, reception } = plan;
+      lights.hang(group, along(new THREE.Vector3(core.x - 3.9, STOREY - 0.08, core.z + 2.05), new THREE.Vector3(core.x + 3.9, STOREY - 0.08, core.z + 2.05), 1), 'warm', { ...warm, sag: 0.16 });
+      // Along the front of the credenza behind reception.
+      lights.hang(group, along(new THREE.Vector3(reception.x - 2.45, 0.92, reception.z + 2.32), new THREE.Vector3(reception.x + 2.45, 0.92, reception.z + 2.32), 0.7), 'warm', { ...warm, sag: 0.09, spacing: 0.08 });
+      // Along the top of the pod's screen, in swags down its face toward your office.
+      for (const { parent, pod } of pods) lights.hang(parent, along(new THREE.Vector3(pod.x - 1.62, 1.235, pod.z + 0.05), new THREE.Vector3(pod.x + 1.62, 1.235, pod.z + 0.05), 0.54), 'multi', { sag: 0.07, spacing: 0.1, size: 0.014, halo: 0.14 });
+      // Two more spirals round the tree, between the turns of its own: one warm, one coloured.
+      const tree = treeAt(plan);
+      for (const [look, count, offset] of [
+        ['warm', 120, Math.PI],
+        ['multi', 70, Math.PI / 2],
+      ] as const)
+        lights.add(
+          group,
+          Array.from({ length: count }, (_, k) => {
+            const t = k / (count - 1);
+            const y = 0.56 + t * 1.78;
+            const a = offset + t * Math.PI * 2 * 5.5;
+            const reach = treeRadius(y) + 0.012;
+            return new THREE.Vector3(tree.x + reach * Math.cos(a), y, tree.z + reach * Math.sin(a));
+          }),
+          look,
+          look === 'warm' ? 0.02 : 0.026,
+          look === 'warm' ? 0.16 : 0.26,
+        );
+    },
+    update: (now: number) => {
+      lights.update(now);
+      if (calm) return;
+      if (star) star.emissiveIntensity = 0.8 + 0.6 * (0.5 + 0.5 * Math.sin((now / 1000) * 1.3));
+    },
+    dispose: () => lights.dispose(),
+  };
+}
+
+// The glass fronts that get a string along their top: your office's from inside, the rooms on the back wall and
+// the waiting room's from the floor.
+export function glassFronts(plan: Plan, rooms: { x0: number; x1: number }[]): Front[] {
+  return [
+    { x0: -OFFICE.hx, x1: OFFICE.hx, z: -OFFICE.hz + 0.07, look: 'warm' },
+    ...rooms.map((room) => ({ x0: room.x0, x1: room.x1, z: -OFFICE.hz - 0.07, look: 'multi' as const })),
+    { x0: plan.waiting.x0, x1: plan.waiting.x1, z: plan.waiting.z1 + 0.07, look: 'warm' },
+  ];
 }
 
 const FALL = 1.1;

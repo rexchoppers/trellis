@@ -8,7 +8,7 @@ import { kitMarkers, placeKit, placeKitMany, type KitPiece, type Spot } from './
 import { fireDoor } from './door';
 import { lifts } from './lifts';
 import { BAY, desksOf, OFFICE, planFloor, type Plan } from './plan';
-import { decorations, tinsel } from './christmas';
+import { decorations, festiveFloor, glassFronts } from './christmas';
 import { christmas } from './season';
 import { fittings } from './fittings';
 import { lighting, type Area } from './lighting';
@@ -40,6 +40,8 @@ export type Floor = {
   fittings: ReturnType<typeof fittings>;
   servers: ReturnType<typeof serverRoom>;
   townHall: ReturnType<typeof townHallScreen>;
+  // Christmas decorations, up only in the season.
+  decor: ReturnType<typeof festiveFloor> | null;
   callFaces: { mesh: THREE.Mesh; normal: THREE.Material; pressed: THREE.Material; point: number }[];
   // The fire alarm panel's screen to paint and reset button to press, filled once the kit has loaded.
   firePanel: { screens: THREE.Mesh[]; resets: THREE.Mesh[] };
@@ -58,7 +60,7 @@ export function buildFloor(departments: config.Department[], places: config.Plac
   const noShadow: THREE.Object3D[] = [];
   const obstacles: Obstacle[] = [];
   const plan = planFloor(departments, places);
-  const festive = christmas();
+  const decor = christmas() ? festiveFloor(plan) : null;
   const { x0, x1, z0, z1 } = plan;
   const w = x1 - x0;
   const d = z1 - z0;
@@ -186,7 +188,7 @@ export function buildFloor(departments: config.Department[], places: config.Plac
     { key: 'town_hall', piece: 'town_hall', centre: plan.townHall.centre },
     ...plan.walls.map((wall, i) => ({ key: `wall_${i}`, piece: wall.style, centre: wall.centre, rotationY: wall.rotationY, felt: feltOf(wall.department.colour) })),
     ...meetings.map((room) => ({ key: room.key, piece: room.piece, centre: new THREE.Vector3((room.x0 + room.x1) / 2, 0, (back - OFFICE.hz) / 2) })),
-    ...(festive ? decorations(plan) : []),
+    ...(decor ? decorations(plan) : []),
   ];
   const welcome = signFace(m, name || 'Welcome', 'Reception', '#ffc861');
   const exit = exitSign(m);
@@ -198,15 +200,16 @@ export function buildFloor(departments: config.Department[], places: config.Plac
   const placed: typeof fixtures = [...fixtures, ...plan.places.map(({ place, centre }) => ({ key: place.key, piece: place.kind as KitPiece, centre }))];
   const ready = Promise.all(
     placed.map(async ({ key, piece, centre, rotationY = 0, felt }) => {
-      placeKit(group, piece, centre.x, centre.z, rotationY, felt, (model) =>
+      placeKit(group, piece, centre.x, centre.z, rotationY, felt, (model) => {
         model.traverse((object) => {
           if (!(object instanceof THREE.Mesh)) return;
           const name = (object.material as THREE.Material).name;
           if (name === 'sign_face') object.material = welcome;
           if (name === 'exit_sign') object.material = exit;
           if (name === 'hall_screen') object.material = hall.material;
-        }),
-      );
+        });
+        decor?.dress(model);
+      });
       const here: PlaceSpots = { serve: [], seat: [] };
       spots.set(key, here);
       const cos = Math.cos(rotationY);
@@ -247,7 +250,7 @@ export function buildFloor(departments: config.Department[], places: config.Plac
     const felt = feltOf(dept.colour);
     for (const pod of zone.pods) {
       placeKit(room, 'pod_screen', pod.x, pod.z, 0, felt);
-      if (festive) tinsel(room, pod, pods++);
+      decor?.pod(room, pod, pods++);
       obstacles.push({ x: pod.x, z: pod.z, hx: 1.75, hz: 0.9 });
     }
     for (const desk of zone.desks) placeKit(room, 'workstation', desk.spot.x, desk.spot.z, Math.atan2(desk.inward.x, desk.inward.z));
@@ -324,6 +327,7 @@ export function buildFloor(departments: config.Department[], places: config.Plac
   });
 
   shadows(group, new Set([...glass, ...noShadow, ...ceiling.children]));
+  decor?.finish(group, glassFronts(plan, [...meetings, { x0: print.x - 2.5, x1: print.x + 2.5 }]), walled);
   return {
     group,
     plan,
@@ -341,6 +345,7 @@ export function buildFloor(departments: config.Department[], places: config.Plac
     fittings: fit,
     servers,
     townHall: hall,
+    decor,
     centre: new THREE.Vector3(cx, 0, cz),
     size: Math.max(w, d),
     dispose: () => {
@@ -350,6 +355,7 @@ export function buildFloor(departments: config.Department[], places: config.Plac
       fit.dispose();
       servers.dispose();
       hall.dispose();
+      decor?.dispose();
       disposeGeometry(group);
       m.dispose();
     },
