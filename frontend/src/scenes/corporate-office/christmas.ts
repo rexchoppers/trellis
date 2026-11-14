@@ -57,6 +57,7 @@ const foil = (colour: number) => foils.get(colour) ?? foils.set(colour, new THRE
 const ball = new THREE.SphereGeometry(1, 16, 12);
 const shiny = new THREE.MeshStandardMaterial({ metalness: 0.5, roughness: 0.22 });
 const twine = new THREE.LineBasicMaterial({ color: 0xbdbdbd });
+const plane = new THREE.PlaneGeometry(1, 1);
 
 function starShape() {
   const shape = new THREE.Shape();
@@ -103,10 +104,50 @@ function streamer(a: THREE.Vector3, b: THREE.Vector3, sag: number) {
   return geometry;
 }
 
+function snowflake(seed: number) {
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = 128;
+  const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+  const rng = random(seed);
+  const branches = [0.3 + rng() * 0.15, 0.55 + rng() * 0.15, 0.78 + rng() * 0.08].map((at) => ({ at, length: 0.12 + rng() * 0.16 }));
+  ctx.translate(64, 64);
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 5;
+  for (let arm = 0; arm < 6; arm++) {
+    ctx.save();
+    ctx.rotate((arm / 6) * Math.PI * 2);
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, -58);
+    for (const { at, length } of branches)
+      for (const side of [-1, 1]) {
+        ctx.moveTo(0, -58 * at);
+        ctx.lineTo(side * 58 * length * Math.sin(Math.PI / 3), -58 * (at + length * Math.cos(Math.PI / 3)));
+      }
+    ctx.stroke();
+    ctx.restore();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  return new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, side: THREE.DoubleSide });
+}
+let flakes: THREE.MeshBasicMaterial[] | undefined;
+
+function random(seed: number) {
+  let s = seed >>> 0;
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0;
+    let r = Math.imul(s ^ (s >>> 15), 1 | s);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
 type Front = { x0: number; x1: number; z: number; look: 'warm' | 'multi' };
 
 // Everything festive that hangs on the floor: lights on the windows, glass fronts, lift core, reception and desks,
-// and foil garlands and baubles across the ceiling over the aisles.
+// foil garlands and baubles across the ceiling over the aisles, and snowflakes on the glass.
 export function festiveFloor(plan: Plan) {
   const lights = stringLights();
   const calm = reducedMotion();
@@ -164,6 +205,38 @@ export function festiveFloor(plan: Plan) {
     spin.mesh = stars;
     const threads = [...hung.map(({ at, size }) => [at.clone().setY(STOREY), at.clone().setY(at.y + size)]), ...spin.at.map((at) => [at.clone().setY(at.y + 0.3), at.clone().setY(at.y + spin.size)])].flat();
     ceiling.add(baubles, stars, new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(threads), twine));
+  };
+
+  const snow = (group: THREE.Object3D, walled: (x: number, z: number) => boolean) => {
+    flakes ??= [11, 23, 37].map(snowflake);
+    const rng = random(7);
+    const { x0, x1, z0, z1 } = plan;
+    const across = Math.round((x1 - x0) / BAY);
+    const deep = Math.round((z1 - z0) / 3);
+    const spots: THREE.Matrix4[][] = flakes.map(() => []);
+    const wall = (count: number, point: (u: number) => THREE.Vector3, facing: number) => {
+      for (let k = 0; k < count; k++) {
+        const mid = point((k + 0.5) / count);
+        if (walled(mid.x, mid.z) || rng() < 0.3) continue;
+        for (let f = rng() < 0.5 ? 1 : 2; f > 0; f--) {
+          const at = point((k + 0.2 + rng() * 0.6) / count).setY(0.7 + rng() * 1.9);
+          const size = 0.22 + rng() * 0.3;
+          const q = new THREE.Quaternion().setFromAxisAngle(up, facing).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), rng() * Math.PI));
+          spots[Math.floor(rng() * spots.length)].push(new THREE.Matrix4().compose(at, q, new THREE.Vector3(size, size, 1)));
+        }
+      }
+    };
+    // Just inside the glass, facing in.
+    wall(across, (u) => new THREE.Vector3(x0 + u * (x1 - x0), 0, z0 + 0.04), 0);
+    wall(across, (u) => new THREE.Vector3(x0 + u * (x1 - x0), 0, z1 - 0.04), Math.PI);
+    wall(deep, (u) => new THREE.Vector3(x0 + 0.04, 0, z0 + u * (z1 - z0)), Math.PI / 2);
+    wall(deep, (u) => new THREE.Vector3(x1 - 0.04, 0, z0 + u * (z1 - z0)), -Math.PI / 2);
+    spots.forEach((list, i) => {
+      const mesh = new THREE.InstancedMesh(plane, flakes![i], list.length);
+      mesh.userData.shared = true;
+      list.forEach((m, k) => mesh.setMatrixAt(k, m));
+      group.add(mesh);
+    });
   };
 
   const windows = (group: THREE.Object3D, walled: (x: number, z: number) => boolean) => {
@@ -235,6 +308,7 @@ export function festiveFloor(plan: Plan) {
           look === 'warm' ? 0.16 : 0.26,
         );
       ceilingDecor(ceiling);
+      snow(group, walled);
     },
     update: (now: number) => {
       lights.update(now);
