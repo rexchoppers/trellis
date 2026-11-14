@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 // Each piece's origin and facing: see the table at the top of assets/scenes/corporate-office/office.py.
-export type KitPiece = 'workstation' | 'exec_desk' | 'plant' | 'kitchen' | 'lift_core' | 'ceiling_light' | 'pod_screen' | 'sofa' | 'low_table' | 'sign_pillar' | 'reception' | 'waiting_room' | 'conference_room' | 'meeting_room' | 'call_point' | 'call_post' | 'lift_door' | 'stairwell' | 'toilets' | 'wc_door' | 'wc_door_accessible' | 'cubicle_door' | 'hand_dryer' | 'tap' | 'plant_room' | 'breaker' | 'server_room' | 'server_rack' | 'server_unit' | 'breakout' | 'printer' | 'print_room' | 'pod_door' | 'phone_pods' | 'locker_door' | 'arrival_hub' | 'town_hall' | 'feature_board' | 'feature_shelf' | 'feature_planter' | 'feature_gallery' | 'feature_display' | 'fire_door' | 'smoke_detector';
+export type KitPiece = 'workstation' | 'exec_desk' | 'plant' | 'kitchen' | 'lift_core' | 'ceiling_light' | 'pod_screen' | 'sofa' | 'low_table' | 'sign_pillar' | 'reception' | 'waiting_room' | 'conference_room' | 'meeting_room' | 'call_point' | 'call_post' | 'lift_door' | 'stairwell' | 'toilets' | 'wc_door' | 'wc_door_accessible' | 'cubicle_door' | 'hand_dryer' | 'tap' | 'plant_room' | 'breaker' | 'server_room' | 'server_rack' | 'server_unit' | 'breakout' | 'printer' | 'print_room' | 'pod_door' | 'phone_pods' | 'locker_door' | 'arrival_hub' | 'town_hall' | 'feature_board' | 'feature_shelf' | 'feature_planter' | 'feature_gallery' | 'feature_display' | 'fire_door' | 'smoke_detector' | 'xmas_tree' | 'xmas_garland' | 'xmas_wreath' | 'xmas_treats' | 'xmas_tinsel' | 'santa_sleigh';
 
 let loading: Promise<Map<string, THREE.Object3D>> | undefined;
 

@@ -42,6 +42,12 @@
 #   call_post      call point on a short post, for glass walls; faces +z
 #   smoke_detector European combined detector and sounder-beacon; origin at the ceiling surface; "strobe" ring flashed by the scene
 #   sign_pillar    post with a framed sign on top, readable from +z and -z; "sign_face" material takes the department's text
+#   xmas_tree      2.6 m Christmas tree in a planter, presents on +z; markers block
+#   xmas_garland   garland along the reception counter's front; origin as reception
+#   xmas_wreath    wreath for a wall, origin on the wall at floor height, faces +z
+#   xmas_treats    a tin of chocolates and cards on the breakout's low table; origin as breakout
+#   xmas_tinsel    tinsel along a pod_screen's top, swags on +z; origin as pod_screen; "tinsel" tinted by the scene
+#   santa_sleigh   Santa in his sleigh behind two pairs of reindeer and Rudolph, heading +z; origin under the sleigh
 # Positions are in three.js terms (x right, y up, z toward you); to_blender converts, the glTF export turns them back.
 
 import math
@@ -50,6 +56,7 @@ import random
 import sys
 
 import bpy
+from mathutils import Vector
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 # Import common.py from beside this script without writing __pycache__ into the assets.
@@ -229,6 +236,28 @@ M = {
     "vend_light": material("vend_light", "#f4f1e8", 0.5, glow=0.8),
     "vend_red": material("vend_red", "#d9483b", 0.4, glow=1.5),
     "vend_blue": material("vend_blue", "#2f7fd6", 0.4, glow=1.5),
+    "pine": material("pine", "#25502e", 0.85),
+    "pine_light": material("pine_light", "#356841", 0.85),
+    "planter": material("planter", "#3a3f47", 0.6),
+    "bauble_red": material("bauble_red", "#9e1b2c", 0.2, 0.5),
+    "bauble_gold": material("bauble_gold", "#c9a24a", 0.25, 0.85),
+    "fairy": material("fairy", "#ffd9a0", 0.4, glow=4.0),
+    "star": material("star", "#f2cf6b", 0.3, 0.6, glow=0.8),
+    "wrap_red": material("wrap_red", "#b3262d", 0.5),
+    "wrap_green": material("wrap_green", "#2f6b45", 0.5),
+    "wrap_cream": material("wrap_cream", "#efe6d2", 0.6),
+    "ribbon": material("ribbon", "#d9b24c", 0.35, 0.6),
+    "bow_red": material("bow_red", "#b01e2a", 0.45),
+    "tin_red": material("tin_red", "#8e1b2a", 0.3, 0.6),
+    "tinsel": material("tinsel", "#d8b45a", 0.2, 1.0),
+    "santa_red": material("santa_red", "#c0262d", 0.55),
+    "fur": material("fur", "#f4f1ea", 0.95),
+    "skin": material("skin", "#e8b896", 0.6),
+    "sack": material("sack", "#7d5a3c", 0.9),
+    "deer": material("deer", "#7a5534", 0.85),
+    "antler": material("antler", "#d9c7a1", 0.7),
+    "nose": material("nose", "#141414", 0.4),
+    "nose_red": material("nose_red", "#e0201b", 0.3, glow=3.0),
 }
 
 
@@ -1901,6 +1930,278 @@ def low_table():
             box(p, M["steel"], 0.04, 0.38, 0.04, sx, 0.19, sz, round_=0.005)
 
 
+TEMPLATES = {}
+
+
+def template(key, make):
+    """A unit mesh made once; each copy skips bpy.ops, which slows as the scene fills and would take minutes for hundreds of beads."""
+    if key not in TEMPLATES:
+        make()
+        made = bpy.context.active_object
+        TEMPLATES[key] = made.data
+        bpy.data.objects.remove(made)
+    return TEMPLATES[key]
+
+
+def instance(parent, mat, mesh, scale, x, y, z):
+    me = mesh.copy()
+    me.materials.append(mat)
+    obj = bpy.data.objects.new(f"{parent.name}_{mat.name}", me)
+    bpy.context.scene.collection.objects.link(obj)
+    obj.scale = scale
+    return place(obj, parent, x, y, z)
+
+
+def bead(parent, mat, r, x, y, z, detail=1):
+    """A small ball; detail 0 is a 20-sided clump, enough for foliage and tiny lights."""
+
+    def make():
+        bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=detail, radius=1)
+        if detail:
+            bpy.ops.object.shade_smooth()
+
+    return instance(parent, mat, template(f"ico{detail}", make), (r, r, r), x, y, z)
+
+
+def strand(parent, mat, w, h, d, x, y, z):
+    """A plain box like box(), w (x), h (y), d (z), with no bevel."""
+    return instance(parent, mat, template("cube", lambda: bpy.ops.mesh.primitive_cube_add(size=1)), (w, d, h), x, y, z)
+
+
+def ellipsoid(parent, mat, rx, ry, rz, x, y, z, detail=2):
+    """Radii along three.js x, y and z."""
+    bpy.ops.mesh.primitive_ico_sphere_add(subdivisions=detail, radius=1)
+    obj = bpy.context.active_object
+    obj.name = f"{parent.name}_{mat.name}"
+    obj.scale = (rx, rz, ry)
+    bpy.ops.object.transform_apply(scale=True)
+    obj.data.materials.append(mat)
+    bpy.ops.object.shade_smooth()
+    return place(obj, parent, x, y, z)
+
+
+def rod(parent, mat, a, b, r, verts=8):
+    """A cylinder from a to b, both in three.js terms."""
+    pa, pb = Vector(to_blender(*a)), Vector(to_blender(*b))
+    bpy.ops.mesh.primitive_cylinder_add(vertices=verts, radius=r, depth=(pb - pa).length)
+    obj = bpy.context.active_object
+    obj.name = f"{parent.name}_{mat.name}"
+    obj.data.materials.append(mat)
+    for poly in obj.data.polygons:
+        poly.use_smooth = len(poly.vertices) == 4
+    mid = (pa + pb) / 2
+    place(obj, parent, mid.x, mid.z, -mid.y)
+    obj.rotation_euler = (pb - pa).to_track_quat("Z", "Y").to_euler()
+    return obj
+
+
+def star(parent, mat, r, x, y, z, depth=0.05):
+    """A five-pointed star standing upright, faceted front (+z) and back."""
+    ring = []
+    for k in range(10):
+        reach = r if k % 2 == 0 else r * 0.42
+        a = math.pi / 2 + k * math.pi / 5
+        ring.append((reach * math.cos(a), 0.0, reach * math.sin(a)))
+    verts = [(0.0, -depth / 2, 0.0), (0.0, depth / 2, 0.0), *ring]
+    faces = [(0, 2 + k, 2 + (k + 1) % 10) for k in range(10)] + [(1, 2 + (k + 1) % 10, 2 + k) for k in range(10)]
+    me = bpy.data.meshes.new(f"{parent.name}_star")
+    me.from_pydata(verts, [], faces)
+    me.update()
+    obj = bpy.data.objects.new(f"{parent.name}_{mat.name}", me)
+    bpy.context.scene.collection.objects.link(obj)
+    obj.data.materials.append(mat)
+    return place(obj, parent, x, y, z)
+
+
+# Each tier of branches: the height it starts at, its radius there, and how tall it is.
+TREE_TIERS = ((0.5, 0.82, 0.72), (0.88, 0.68, 0.64), (1.24, 0.54, 0.58), (1.58, 0.4, 0.52), (1.9, 0.26, 0.5))
+
+
+def tree_radius(y):
+    """How far out the branches reach at height y."""
+    reach = 0.0
+    for base, r, h in TREE_TIERS:
+        if base <= y <= base + h:
+            reach = max(reach, r + (0.02 - r) * (y - base) / h)
+    return reach
+
+
+def xmas_tree():
+    p = piece("xmas_tree")
+    rng = random.Random(11)
+    cyl(p, M["planter"], 0.3, 0.42, 0, 0.21, 0, r_top=0.34, verts=28)
+    cyl(p, M["soil"], 0.33, 0.02, 0, 0.415, 0)
+    cyl(p, M["trunk"], 0.06, 0.2, 0, 0.5, 0, verts=10)
+    for base, r, h in TREE_TIERS:
+        cyl(p, M["pine"], r, h, 0, base + h / 2, 0, r_top=0.02, verts=28)
+    for k in range(30):
+        y = 0.64 + k / 29 * 1.55
+        a = k * 2.4 + rng.uniform(-0.3, 0.3)
+        size = 0.045 if k % 3 == 0 else 0.055
+        reach = tree_radius(y)
+        bead(p, M["bauble_gold" if k % 2 else "bauble_red"], size, reach * math.cos(a), y - size, reach * math.sin(a), detail=2)
+    for k in range(110):
+        t = k / 109
+        y = 0.56 + t * 1.78
+        a = t * 2 * math.pi * 5.5
+        reach = tree_radius(y) + 0.004
+        bead(p, M["fairy"], 0.014, reach * math.cos(a), y, reach * math.sin(a), detail=0)
+    star(p, M["star"], 0.13, 0, 2.52, 0)
+    for x, z, w, h, d, turn, wrap in ((0.5, 0.35, 0.34, 0.24, 0.28, 0.3, "wrap_red"), (-0.45, 0.42, 0.26, 0.2, 0.26, -0.4, "wrap_green"), (0.1, 0.62, 0.3, 0.16, 0.22, 0.1, "wrap_cream")):
+        box(p, M[wrap], w, h, d, x, h / 2, z, rot_y=turn, round_=0.01)
+        box(p, M["ribbon"], w + 0.006, h + 0.006, 0.035, x, h / 2, z, rot_y=turn, round_=0)
+        box(p, M["ribbon"], 0.035, h + 0.006, d + 0.006, x, h / 2, z, rot_y=turn, round_=0)
+    marker(p, "block", 0, 0, w=1.7, d=1.7)
+
+
+def bow(p, x, y, z, size=1.0):
+    """A red bow facing +z: two loops, a knot and two tails."""
+    for side in (-1, 1):
+        ellipsoid(p, M["bow_red"], 0.055 * size, 0.035 * size, 0.022 * size, x + side * 0.055 * size, y, z, detail=1)
+        rod(p, M["bow_red"], (x + side * 0.01 * size, y - 0.01 * size, z), (x + side * 0.05 * size, y - 0.13 * size, z - 0.01 * size), 0.012 * size, verts=6)
+    bead(p, M["bow_red"], 0.024 * size, x, y, z + 0.012 * size)
+
+
+def xmas_garland():
+    p = piece("xmas_garland")
+    rng = random.Random(5)
+    # The counter's arc, as in reception(); the garland hangs just in front of its stone top.
+    radius, spread = 6.0, math.radians(38)
+    centre = radius
+    r = radius + 0.23
+    a0, a1 = -spread + 0.03, spread - 0.03
+    swags = 8
+    steps = int(r * (a1 - a0) / 0.05)
+    for k in range(steps + 1):
+        t = k / steps
+        a = a0 + (a1 - a0) * t
+        y = 1.05 - 0.13 * math.sin(math.pi * (t * swags % 1)) ** 2
+        for _ in range(2):
+            out = r + rng.uniform(-0.012, 0.012)
+            bead(p, M["pine" if rng.random() < 0.6 else "pine_light"], rng.uniform(0.035, 0.05), out * math.sin(a), y + rng.uniform(-0.02, 0.02), centre - out * math.cos(a), detail=0)
+        if k % 4 == 2:
+            out = r + 0.045
+            bead(p, M["fairy"], 0.013, out * math.sin(a), y, centre - out * math.cos(a), detail=0)
+    # The bows face the lifts on -z, so each is turned round from bow()'s +z.
+    for j in range(swags + 1):
+        a = a0 + (a1 - a0) * j / swags
+        out = r + 0.05
+        top = piece(f"xmas_garland_bow_{j}")
+        top.parent = p
+        top.location = to_blender(out * math.sin(a), 0, centre - out * math.cos(a))
+        top.rotation_euler = (0, 0, math.pi - a)
+        bow(top, 0, 1.06, 0, 0.8)
+
+
+def xmas_wreath():
+    p = piece("xmas_wreath")
+    rng = random.Random(9)
+    # Clear of the lift core's directory screen, whose top is at 2.05 m.
+    cy = 2.6
+    for k in range(64):
+        a = k * 2 * math.pi / 64
+        for ring in (0.16, 0.22):
+            rr = ring + rng.uniform(-0.012, 0.012)
+            bead(p, M["pine" if rng.random() < 0.6 else "pine_light"], rng.uniform(0.04, 0.052), rr * math.cos(a), cy + rr * math.sin(a), 0.06 + rng.uniform(-0.006, 0.006), detail=0)
+    for k in range(14):
+        a = k * 2 * math.pi / 14 + 0.2
+        bead(p, M["fairy"], 0.013, 0.19 * math.cos(a), cy + 0.19 * math.sin(a), 0.11, detail=0)
+    bow(p, 0, cy - 0.2, 0.12)
+
+
+def xmas_treats():
+    p = piece("xmas_treats")
+    # The breakout's low table top, as in breakout().
+    top = 0.42
+    cyl(p, M["tin_red"], 0.12, 0.08, -3.05, top + 0.04, 0.28, verts=28)
+    cyl(p, M["brass"], 0.123, 0.02, -3.05, top + 0.07, 0.28, verts=28)
+    # Cards folded into tents: two leaves leaning together.
+    lean = 0.3
+    for x, z, turn, mat in ((-2.62, 0.04, 0.2, "wrap_red"), (-2.46, 0.3, -0.3, "wrap_green"), (-2.38, 0.04, 0.5, "wrap_cream"), (-2.66, 0.34, 0.1, "wrap_cream")):
+        for side in (-1, 1):
+            off = side * math.sin(lean) * 0.07
+            leaf = box(p, M[mat], 0.1, 0.14, 0.002, x + off * math.sin(turn), top + math.cos(lean) * 0.07, z + off * math.cos(turn), round_=0)
+            leaf.rotation_euler = (-side * lean, 0, turn)
+
+
+def xmas_tinsel():
+    p = piece("xmas_tinsel")
+    rng = random.Random(3)
+    length, steps = 3.2, 160
+    for k in range(steps + 1):
+        t = k / steps
+        sag = math.sin(math.pi * (t * 2 % 1)) ** 2
+        # Along the screen's top, then down its +z face in the swags.
+        y, z = 1.28 - 0.1 * sag, 0.075 * min(1.0, sag * 3)
+        for _ in range(4):
+            foil = strand(p, M["tinsel"], 0.012, 0.09, 0.002, -length / 2 + t * length + rng.uniform(-0.01, 0.01), y, z)
+            foil.rotation_euler = (rng.uniform(0, math.pi), rng.uniform(0, math.pi), rng.uniform(0, math.pi))
+
+
+def reindeer(p, x, z, nose):
+    deer = M["deer"]
+    ellipsoid(p, deer, 0.2, 0.22, 0.48, x, 0.8, z)
+    rod(p, deer, (x, 0.9, z + 0.35), (x, 1.2, z + 0.55), 0.08)
+    ellipsoid(p, deer, 0.09, 0.1, 0.17, x, 1.27, z + 0.66)
+    bead(p, M[nose], 0.045 if nose == "nose_red" else 0.035, x, 1.25, z + 0.83, detail=2)
+    bead(p, M["fur"], 0.06, x, 0.92, z - 0.48)
+    for side in (-1, 1):
+        ellipsoid(p, deer, 0.02, 0.05, 0.03, x + side * 0.08, 1.36, z + 0.58, detail=1)
+        rod(p, M["antler"], (x + side * 0.04, 1.34, z + 0.62), (x + side * 0.2, 1.62, z + 0.52), 0.015, verts=6)
+        rod(p, M["antler"], (x + side * 0.12, 1.48, z + 0.57), (x + side * 0.16, 1.58, z + 0.66), 0.012, verts=6)
+        rod(p, M["antler"], (x + side * 0.17, 1.56, z + 0.54), (x + side * 0.26, 1.64, z + 0.6), 0.01, verts=6)
+        # Flying: front legs reach forward, hind legs stretch back.
+        rod(p, deer, (x + side * 0.1, 0.68, z + 0.3), (x + side * 0.1, 0.5, z + 0.72), 0.04)
+        bead(p, M["bezel"], 0.04, x + side * 0.1, 0.49, z + 0.74)
+        rod(p, deer, (x + side * 0.1, 0.68, z - 0.3), (x + side * 0.1, 0.52, z - 0.78), 0.045)
+        bead(p, M["bezel"], 0.045, x + side * 0.1, 0.51, z - 0.8)
+
+
+def santa_sleigh():
+    p = piece("santa_sleigh")
+    red, gold, strap = M["santa_red"], M["brass"], M["leather"]
+    for side in (-1, 1):
+        x = side * 0.55
+        rod(p, gold, (x, 0.0, -1.0), (x, 0.0, 1.0), 0.035)
+        rod(p, gold, (x, 0.0, 1.0), (x, 0.22, 1.28), 0.035)
+        rod(p, gold, (x, 0.22, 1.28), (x, 0.45, 1.2), 0.035)
+        rod(p, gold, (x, 0.0, -1.0), (x, 0.08, -1.12), 0.035)
+        for z in (-0.6, 0.5):
+            rod(p, gold, (x, 0.0, z), (x, 0.3, z), 0.025)
+    box(p, red, 1.24, 0.5, 1.7, 0, 0.53, -0.05, round_=0.06)
+    box(p, red, 1.24, 0.75, 0.14, 0, 0.9, -0.85, round_=0.05)
+    box(p, red, 1.24, 0.3, 0.3, 0, 0.62, 0.85, round_=0.06)
+    box(p, gold, 1.27, 0.04, 1.73, 0, 0.29, -0.05, round_=0.01)
+    box(p, gold, 1.27, 0.04, 0.17, 0, 1.27, -0.85, round_=0.01)
+    box(p, strap, 1.1, 0.06, 0.55, 0, 0.8, -0.5, round_=0.02)
+    # Santa, sitting at the back with the reins.
+    s = -0.45
+    ellipsoid(p, red, 0.3, 0.32, 0.26, 0, 1.12, s)
+    cyl(p, strap, 0.29, 0.07, 0, 1.0, s, verts=24)
+    box(p, gold, 0.1, 0.08, 0.02, 0, 1.0, s + 0.29, round_=0.005)
+    bead(p, M["skin"], 0.13, 0, 1.52, s + 0.02, detail=2)
+    ellipsoid(p, M["fur"], 0.13, 0.12, 0.08, 0, 1.43, s + 0.1)
+    cyl(p, M["fur"], 0.14, 0.05, 0, 1.6, s, verts=20)
+    cyl(p, red, 0.13, 0.26, 0, 1.75, s - 0.03, r_top=0.02, verts=20)
+    bead(p, M["fur"], 0.045, 0, 1.88, s - 0.06)
+    for side in (-1, 1):
+        rod(p, red, (side * 0.26, 1.3, s), (side * 0.2, 1.24, s + 0.36), 0.07)
+        bead(p, strap, 0.06, side * 0.2, 1.24, s + 0.38)
+    ellipsoid(p, M["sack"], 0.3, 0.2, 0.22, 0, 0.95, 0.3)
+    cyl(p, M["sack"], 0.06, 0.12, 0, 1.17, 0.3, verts=12)
+    pairs, lead = (2.3, 4.0), 5.7
+    for z in pairs:
+        for x in (-0.45, 0.45):
+            reindeer(p, x, z, "nose")
+    reindeer(p, 0, lead, "nose_red")
+    # Traces from the sleigh to the first pair, pair to pair, and on to Rudolph; reins from Santa's hands.
+    for x in (-0.45, 0.45):
+        rod(p, strap, (x, 0.55, 1.0), (x, 0.8, pairs[0] - 0.45), 0.015, verts=6)
+        rod(p, strap, (x, 0.85, pairs[0] + 0.45), (x, 0.8, pairs[1] - 0.45), 0.015, verts=6)
+        rod(p, strap, (x, 0.85, pairs[1] + 0.45), (x * 0.25, 0.8, lead - 0.45), 0.015, verts=6)
+        rod(p, strap, (x * 0.45, 1.24, s + 0.4), (x, 1.05, pairs[0] + 0.4), 0.01, verts=6)
+
+
 workstation()
 exec_desk()
 plant()
@@ -1945,6 +2246,12 @@ call_post()
 smoke_detector()
 sofa()
 low_table()
+xmas_tree()
+xmas_garland()
+xmas_wreath()
+xmas_treats()
+xmas_tinsel()
+santa_sleigh()
 merge()
 
 os.makedirs(os.path.dirname(GLB), exist_ok=True)
