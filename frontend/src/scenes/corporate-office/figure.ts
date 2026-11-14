@@ -1,5 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { christmas } from './season';
 
 export const reducedMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -32,6 +34,8 @@ function alertMarker() {
 
 // Shared by every figure (userData.shared, never disposed). Facing +z.
 let figureShapes: { body: THREE.BufferGeometry; head: THREE.BufferGeometry; hair: THREE.BufferGeometry; eye: THREE.BufferGeometry } | undefined;
+let hatShapes: { brim: THREE.BufferGeometry; crown: THREE.BufferGeometry; bobble: THREE.BufferGeometry } | undefined;
+const HAT_FLOP = new THREE.Vector3(0.13, -0.07, -0.19);
 const figureMaterials = new Map<string, THREE.Material>();
 const SKIN = ['#e2b98f', '#c68d63', '#8d5a3b', '#f0c9a4'];
 const HAIR = ['#2a1d14', '#6b4428', '#111111', '#a0703c'];
@@ -71,6 +75,27 @@ export function figureBody(colour: string, seed: string) {
   part('head', figureShapes.head, figureMaterial(pick(SKIN, seed, 7)), 0, 1.16, 0);
   part('hair', figureShapes.hair, figureMaterial(pick(HAIR, seed, 13), 0.7), 0, 1.38, -0.01);
   for (const x of [-0.08, 0.08]) part('eye', figureShapes.eye, figureMaterial('#15171c', 0.25), x, 1.19, 0.2);
+  if (christmas()) {
+    // A Santa hat, its tip flopped back and to one side. Bent rather than tilted, so its rim stays flat on the fur.
+    if (!hatShapes) {
+      const cone = new THREE.ConeGeometry(0.2, 0.42, 14, 6, true).translate(0, 0.21, 0);
+      cone.deleteAttribute('uv');
+      cone.deleteAttribute('normal');
+      const crown = mergeVertices(cone);
+      cone.dispose();
+      const at = crown.attributes.position;
+      for (let i = 0; i < at.count; i++) {
+        const bend = (at.getY(i) / 0.42) ** 2;
+        at.setXYZ(i, at.getX(i) + HAT_FLOP.x * bend, at.getY(i) + HAT_FLOP.y * bend, at.getZ(i) + HAT_FLOP.z * bend);
+      }
+      crown.computeVertexNormals();
+      hatShapes = { brim: new RoundedBoxGeometry(0.47, 0.09, 0.45, 2, 0.04), crown, bobble: new THREE.SphereGeometry(0.065, 12, 8) };
+    }
+    const tip = new THREE.Vector3(0, 0.42, 0).add(HAT_FLOP);
+    part('hat', hatShapes.crown, figureMaterial('#c4202b', 0.75), 0, 1.47, 0);
+    part('hat', hatShapes.brim, figureMaterial('#f4f1ea', 0.95), 0, 1.44, -0.01);
+    part('hat', hatShapes.bobble, figureMaterial('#f4f1ea', 0.95), tip.x, 1.47 + tip.y, tip.z);
+  }
   return figure;
 }
 
