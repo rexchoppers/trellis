@@ -8,6 +8,8 @@ import { kitMarkers, placeKit, placeKitMany, type KitPiece, type Spot } from './
 import { fireDoor } from './door';
 import { lifts } from './lifts';
 import { BAY, desksOf, OFFICE, planFloor, type Plan } from './plan';
+import { decorations, tinsel } from './christmas';
+import { christmas } from './season';
 import { fittings } from './fittings';
 import { lighting, type Area } from './lighting';
 import { serverRoom } from './servers';
@@ -56,6 +58,7 @@ export function buildFloor(departments: config.Department[], places: config.Plac
   const noShadow: THREE.Object3D[] = [];
   const obstacles: Obstacle[] = [];
   const plan = planFloor(departments, places);
+  const festive = christmas();
   const { x0, x1, z0, z1 } = plan;
   const w = x1 - x0;
   const d = z1 - z0;
@@ -183,6 +186,7 @@ export function buildFloor(departments: config.Department[], places: config.Plac
     { key: 'town_hall', piece: 'town_hall', centre: plan.townHall.centre },
     ...plan.walls.map((wall, i) => ({ key: `wall_${i}`, piece: wall.style, centre: wall.centre, rotationY: wall.rotationY, felt: feltOf(wall.department.colour) })),
     ...meetings.map((room) => ({ key: room.key, piece: room.piece, centre: new THREE.Vector3((room.x0 + room.x1) / 2, 0, (back - OFFICE.hz) / 2) })),
+    ...(festive ? decorations(plan) : []),
   ];
   const welcome = signFace(m, name || 'Welcome', 'Reception', '#ffc861');
   const exit = exitSign(m);
@@ -221,6 +225,7 @@ export function buildFloor(departments: config.Department[], places: config.Plac
 
   const rooms = new Map<string, Room>();
   const toYou = new THREE.Vector3(0, 0, 1);
+  let pods = 0;
   for (const zone of plan.zones) {
     const dept = zone.department;
     const colour = new THREE.Color(dept.colour);
@@ -242,6 +247,7 @@ export function buildFloor(departments: config.Department[], places: config.Plac
     const felt = feltOf(dept.colour);
     for (const pod of zone.pods) {
       placeKit(room, 'pod_screen', pod.x, pod.z, 0, felt);
+      if (festive) tinsel(room, pod, pods++);
       obstacles.push({ x: pod.x, z: pod.z, hx: 1.75, hz: 0.9 });
     }
     for (const desk of zone.desks) placeKit(room, 'workstation', desk.spot.x, desk.spot.z, Math.atan2(desk.inward.x, desk.inward.z));
