@@ -16,6 +16,9 @@ const (
 	Never Level = "never"
 )
 
+// Listing it gives an agent Trellis's artifact tool: claude -p has no Artifact tool of its own.
+const ArtifactTool = "Artifact"
+
 var BuiltIn = []string{"Read", "Grep", "Glob", "LS", "Bash", "Edit", "Write", "MultiEdit", "NotebookEdit", "WebFetch", "WebSearch", "Task"}
 
 // Server name to the project's nicknames for it.
@@ -181,6 +184,13 @@ func (a Agent) StepFor(tool string, input json.RawMessage, names Names) []string
 		}
 	}
 	return steps
+}
+
+// Lists reports whether any free or ask rule names tool, with or without an argument.
+func (a Agent) Lists(tool string) bool {
+	return slices.ContainsFunc(slices.Concat(a.Permissions.Free, a.Permissions.Ask), func(rule string) bool {
+		return strings.SplitN(strings.TrimSpace(rule), "(", 2)[0] == tool
+	})
 }
 
 func (a Agent) StepTool(rule string) bool {

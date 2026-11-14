@@ -199,6 +199,7 @@ const (
 	Delegate     = "delegate"
 	Message      = "message"
 	Rest         = "rest"
+	Artifact     = "artifact"
 )
 
 var All = []Tool{
@@ -238,6 +239,22 @@ var All = []Tool{
 			"type":       "object",
 			"required":   []string{"handover"},
 			"properties": map[string]any{"handover": str},
+		},
+	},
+	{
+		Name: Artifact,
+		Description: "Publish a private claude.ai artifact and get its link back: kind design is a Claude Design canvas of mockups (screens, states), kind page is any other page. " +
+			"title names it. brief is everything the maker needs, since it sees nothing else: look (theme, colours, spacing, components), every screen and state, every word on screen. " +
+			"To change one you made, pass its url with a brief of what to change. Takes a few minutes; returns the link, or why it failed.",
+		InputSchema: map[string]any{
+			"type":     "object",
+			"required": []string{"kind", "title", "brief"},
+			"properties": map[string]any{
+				"kind":  map[string]any{"type": "string", "enum": []string{"design", "page"}},
+				"title": str,
+				"brief": str,
+				"url":   map[string]any{"type": "string", "description": "An artifact you made earlier, to change it in place."},
+			},
 		},
 	},
 	{

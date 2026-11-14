@@ -30,6 +30,8 @@ func (m *Manager) tool(l *live, name string, args json.RawMessage) (string, erro
 		return m.onFinish(l, args)
 	case gate.CheckIn:
 		return m.onCheckIn(l, args)
+	case gate.Artifact:
+		return m.onArtifact(l, args)
 	}
 	return "", fmt.Errorf("Unknown tool %s", name)
 }

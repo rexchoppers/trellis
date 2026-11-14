@@ -130,6 +130,9 @@ func (m *Manager) run(root string, job Job, d config.Department, agent config.Ag
 	if agent.Every != "" {
 		tools = append(tools, gate.Rest)
 	}
+	if agent.Lists(config.ArtifactTool) {
+		tools = append(tools, gate.Artifact)
+	}
 	m.Gate.Register(l.token, tools, func(name string, args json.RawMessage) (string, error) {
 		return m.tool(l, name, args)
 	})
