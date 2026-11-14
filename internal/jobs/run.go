@@ -169,7 +169,8 @@ func writeMCPConfig(dir string, servers map[string]mcpconf.Server, gateURL strin
 	for name, server := range servers {
 		all[name] = server.Config
 	}
-	trellis, _ := json.Marshal(map[string]string{"type": "http", "url": gateURL})
+	// Claude Code drops an MCP call silent for 5 minutes; permission and artifact calls wait far longer.
+	trellis, _ := json.Marshal(map[string]any{"type": "http", "url": gateURL, "timeout": 86400000})
 	all["trellis"] = trellis
 	raw, err := json.MarshalIndent(map[string]any{"mcpServers": all}, "", "  ")
 	if err != nil {
