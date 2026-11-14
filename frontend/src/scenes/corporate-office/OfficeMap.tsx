@@ -8,6 +8,8 @@ import { STOREY } from './build';
 import { fireAlarm } from './alarm';
 import { installRoomLight } from './lighting';
 import { cameraRig, typing, type View } from './camera';
+import { festiveSky } from './christmas';
+import { christmas } from './season';
 import { reducedMotion } from './figure';
 import { buildFloor, fitSun, type Floor } from './floor';
 import { npcCrowd } from './npcs';
@@ -76,6 +78,7 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
     const canvas = renderer.domElement;
 
     const world = buildWorld();
+    const sky = christmas() ? festiveSky(world.scene) : null;
     // Gives metal, glass and polished floors something to reflect.
     const pmrem = new THREE.PMREMGenerator(renderer);
     const environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -122,6 +125,7 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
       floor?.fittings.update(now);
       floor?.servers.update(now, atDesk ? camera.position : null);
       rig.update(dt, now);
+      sky?.update(now, camera.position);
       renderer.render(world.scene, camera);
       counted.frames++;
       if (now - counted.since > 500) {
@@ -148,6 +152,7 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
       built.townHall.show(running);
       void built.ready.then(() => floor === built && alarm.attach(built));
       world.scene.add(floor.group);
+      sky?.fit(built.plan);
       npcs.place(floor, npcListRef.current);
       const keysNow = new Set(next.map((d) => d.key));
       if (known && !reducedMotion()) for (const key of keysNow) if (!known.has(key)) rising.set(key, performance.now());
@@ -323,6 +328,7 @@ export default function OfficeMap({ departments, jobs: list = [], view, name = '
       npcs.dispose();
       floor?.dispose();
       alarm.dispose();
+      sky?.dispose();
       world.dispose();
       environment.dispose();
       pmrem.dispose();
