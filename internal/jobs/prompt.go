@@ -10,7 +10,7 @@ import (
 	"github.com/rexchoppers/trellis/internal/gate"
 )
 
-func args(job Job, d config.Department, agent config.Agent, mcpConfig string) []string {
+func args(job Job, d config.Department, agent config.Agent, mcpConfig, dir string) []string {
 	// Built-in rules go straight to Claude Code; MCP rules by nickname (linear/*) are decided by Trellis's permission tool.
 	var allowed []string
 	for _, tool := range gate.All {
@@ -95,6 +95,9 @@ End every check with rest and a one-line note of where things stand. Trellis wak
 	}
 	if job.Branch != "" {
 		system += fmt.Sprintf("\n- You are working in your own git worktree on branch %s. Commit your work as you go. When the human marks the job done, Trellis pushes the branch and opens a PR; do not push or open one yourself.", job.Branch)
+	}
+	if notes := agentsMD(dir); notes != "" {
+		system += "\n\nContents of AGENTS.md (project instructions, checked into the codebase):\n\n" + notes
 	}
 	out := []string{"-p", "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
 		"--permission-prompt-tool", "mcp__trellis__" + gate.Permission,

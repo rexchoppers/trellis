@@ -141,7 +141,7 @@ func (m *Manager) run(root string, job Job, d config.Department, agent config.Ag
 		m.Gate.Revoke(l.token)
 		return m.fail(root, job.ID, err.Error())
 	}
-	sess, err := startSession(dir, args(job, d, agent, configPath), log, func(line []byte) { m.line(l, line) }, func(err error) {
+	sess, err := startSession(dir, args(job, d, agent, configPath, dir), log, func(line []byte) { m.line(l, line) }, func(err error) {
 		_ = log.Close()
 		m.exited(l, err)
 	})
