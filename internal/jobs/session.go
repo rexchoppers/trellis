@@ -28,9 +28,10 @@ const outputTokens = "2000000"
 const mcpStartTimeout = "60000"
 
 func startSession(dir string, args []string, log io.Writer, onLine func([]byte), onExit func(err error)) (*session, error) {
-	cmd := exec.Command("claude", args...)
+	// --setting-sources "" also drops the project's CLAUDE.md; adding the job folder as a directory loads it (and its @ imports) without the project's settings or hooks.
+	cmd := exec.Command("claude", append(args, "--add-dir", dir)...)
 	cmd.Dir = dir
-	cmd.Env = append(os.Environ(), "CLAUDE_CODE_DISABLE_AUTO_MEMORY=1", "MCP_TOOL_TIMEOUT="+toolTimeout, "CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT="+toolTimeout, "MCP_TIMEOUT="+mcpStartTimeout, "MAX_MCP_OUTPUT_TOKENS="+outputTokens)
+	cmd.Env = append(os.Environ(), "CLAUDE_CODE_ADDITIONAL_DIRECTORIES_CLAUDE_MD=1", "CLAUDE_CODE_DISABLE_AUTO_MEMORY=1", "MCP_TOOL_TIMEOUT="+toolTimeout, "CLAUDE_CODE_MCP_TOOL_IDLE_TIMEOUT="+toolTimeout, "MCP_TIMEOUT="+mcpStartTimeout, "MAX_MCP_OUTPUT_TOKENS="+outputTokens)
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err
