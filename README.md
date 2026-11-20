@@ -103,3 +103,19 @@ You are **Quinn**, the QA agent. Read the PR against its ticket and list what is
 | `every` | Wake on a timer (for example `10m`) and check again |
 | `model` | Claude model for this agent |
 | `instructions` | Use another file's body as the prompt, for example an existing `.claude/agents` file |
+
+## Build from source
+
+Needs Go 1.26 or newer, [Wails v3](https://v3.wails.io), pnpm and macOS 13 or newer.
+
+```
+make deps    # wails3 CLI, Go modules, frontend packages
+make dev     # run with hot reload
+make build   # build build/bin/trellis.app
+```
+
+The office is modelled in Blender from Python scripts in `assets/scenes/corporate-office/`. `make models` rebuilds `office.glb` (needs Blender).
+
+## License
+
+MIT
