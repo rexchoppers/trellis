@@ -1,6 +1,6 @@
 import { countBy } from 'es-toolkit';
 import { useState } from 'react';
-import type { config, jobs } from '../../wailsjs/go/models';
+import type { config, jobs } from '@/lib/models';
 import { findAgent, jobTask, STATES, stateLabel } from '@/lib/jobs';
 import { cn } from '@/lib/utils';
 import { Select, Stat, Swatch } from './shared';
@@ -17,7 +17,7 @@ const ago = (value: string) => {
   return days === 1 ? 'yesterday' : `${days} days ago`;
 };
 
-function Produced({ items }: { items: jobs.Produced[] }) {
+function Produced({ items }: { items: jobs.Produced[] | null }) {
   if (!items?.length) return <span className="text-muted-foreground">–</span>;
   const shown = items.slice(0, 4);
   return (

@@ -7,14 +7,15 @@ import (
 	"github.com/rexchoppers/trellis/internal/config"
 	"github.com/rexchoppers/trellis/internal/setup"
 	"github.com/rexchoppers/trellis/internal/shellenv"
-	"github.com/wailsapp/wails/v2"
-	"github.com/wailsapp/wails/v2/pkg/options"
-	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
-	"github.com/wailsapp/wails/v2/pkg/options/mac"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 //go:embed all:frontend/dist
 var assets embed.FS
+
+func init() {
+	application.RegisterEvent[JobChanged]("job")
+}
 
 func main() {
 	shellenv.UseLoginPath()
@@ -22,26 +23,30 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	app := NewApp(&setup.Service{ConfigDir: dir})
 
-	err = wails.Run(&options.App{
+	app := application.New(application.Options{
+		Name:        "Trellis",
+		Description: "Welcome to the 47th floor",
+		Services:    []application.Service{application.NewService(NewApp(&setup.Service{ConfigDir: dir}))},
+		Assets:      application.AssetOptions{Handler: application.AssetFileServerFS(assets)},
+		Mac:         application.MacOptions{ApplicationShouldTerminateAfterLastWindowClosed: true},
+	})
+
+	app.Window.NewWithOptions(application.WebviewWindowOptions{
 		Title:            "Trellis",
 		Width:            1280,
 		Height:           820,
 		MinWidth:         640,
 		MinHeight:        480,
-		AssetServer:      &assetserver.Options{Assets: assets},
-		BackgroundColour: &options.RGBA{R: 15, G: 14, B: 23, A: 1},
-		OnStartup:        app.startup,
-		OnShutdown:       app.shutdown,
-		Bind:             []interface{}{app},
-		Mac: &mac.Options{
-			TitleBar:   mac.TitleBarHiddenInset(),
-			Appearance: mac.NSAppearanceNameDarkAqua,
-			About:      &mac.AboutInfo{Title: "Trellis", Message: "Welcome to the 47th floor"},
+		BackgroundColour: application.NewRGB(15, 14, 23),
+		URL:              "/",
+		Mac: application.MacWindow{
+			TitleBar:   application.MacTitleBarHiddenInset,
+			Appearance: application.NSAppearanceNameDarkAqua,
 		},
 	})
-	if err != nil {
+
+	if err := app.Run(); err != nil {
 		log.Fatal(err)
 	}
 }

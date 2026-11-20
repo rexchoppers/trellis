@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { config, jobs } from '../../../wailsjs/go/models';
+import type { config, jobs } from '@/lib/models';
 import { STOREY, type Materials, type Obstacle } from './build';
 import type { Row } from './fittings';
 import { placeKit } from './kit';

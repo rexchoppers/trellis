@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { config, jobs } from '../../../wailsjs/go/models';
+import type { config, jobs } from '@/lib/models';
 import { liveFace } from './build';
 
 const W = 1024;

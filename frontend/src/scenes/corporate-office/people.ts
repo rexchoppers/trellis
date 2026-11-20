@@ -1,6 +1,6 @@
 import { sumBy } from 'es-toolkit';
 import * as THREE from 'three';
-import type { config, jobs } from '../../../wailsjs/go/models';
+import type { config, jobs } from '@/lib/models';
 import { DESK_Z, OFFICE, type Desk, type Plan } from './plan';
 
 export type AgentHit = { department: string; agent: string; run?: string };

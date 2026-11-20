@@ -1,5 +1,5 @@
 import { compact, partition, sortBy, sumBy } from 'es-toolkit';
-import type { config } from '../../wailsjs/go/models';
+import type { config, Fields } from '@/lib/models';
 
 export const CARD_W = 280;
 export const HEAD_H = 58;
@@ -20,7 +20,7 @@ type Problem = { text: string };
 export type Route = { d: string; x: number; y: number; h: number; lane: boolean };
 
 export const keyOf = (d: config.Department, a: config.Agent) => `${d.key}/${a.key}`;
-export const describe = (when?: Record<string, string>) =>
+export const describe = (when?: Fields | null) =>
   Object.entries(when ?? {})
     .map(([key, value]) => `${key}: ${value}`)
     .join(', ');
@@ -31,7 +31,7 @@ const stepsHeight = (a: config.Agent) => (a.steps?.length ? 10 + sumBy(a.steps, 
 export const outcomeOf = (node: Node, edge: Edge) => (edge.outcome === undefined ? undefined : (node.agent.outcomes ?? [])[edge.outcome]);
 
 // A field missing from the data may still turn up, so it is a maybe; callers decide if that counts.
-export function matches(when: Record<string, string> | undefined, data: Record<string, string> | undefined): 'yes' | 'maybe' | 'no' {
+export function matches(when: Fields | null | undefined, data: Fields | null | undefined): 'yes' | 'maybe' | 'no' {
   let result: 'yes' | 'maybe' = 'yes';
   for (const [key, value] of Object.entries(when ?? {})) {
     if (data?.[key] === undefined) result = 'maybe';

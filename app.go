@@ -8,11 +8,10 @@ import (
 	"github.com/rexchoppers/trellis/internal/gate"
 	"github.com/rexchoppers/trellis/internal/jobs"
 	"github.com/rexchoppers/trellis/internal/setup"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 type App struct {
-	ctx   context.Context
 	setup *setup.Service
 	gate  *gate.Server
 	jobs  *jobs.Manager
@@ -27,26 +26,27 @@ func NewApp(service *setup.Service) *App {
 	return &App{setup: service}
 }
 
-func (a *App) startup(ctx context.Context) {
-	a.ctx = ctx
+func (a *App) ServiceStartup(context.Context, application.ServiceOptions) error {
 	a.gate = gate.New()
 	if err := a.gate.Start(); err != nil {
-		runtime.LogErrorf(ctx, "gate: %v", err)
-		return
+		application.Get().Logger.Error("gate", "error", err)
+		return nil
 	}
 	home, _ := os.UserHomeDir()
 	a.jobs = &jobs.Manager{Gate: a.gate, Home: home, Changed: func(root, id string) {
-		runtime.EventsEmit(a.ctx, "job", JobChanged{Path: root, ID: id})
+		application.Get().Event.Emit("job", JobChanged{Path: root, ID: id})
 	}}
+	return nil
 }
 
-func (a *App) shutdown(context.Context) {
+func (a *App) ServiceShutdown() error {
 	if a.jobs != nil {
 		a.jobs.Close()
 	}
 	if a.gate != nil {
 		_ = a.gate.Close()
 	}
+	return nil
 }
 
 func (a *App) manager(path string) (*jobs.Manager, string, error) {

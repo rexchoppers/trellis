@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { CancelJob, Finish, ReviewComments, SendMessage } from '../../../wailsjs/go/main/App';
-import type { config, jobs } from '../../../wailsjs/go/models';
+import { CancelJob, Finish, ReviewComments, SendMessage } from '@bindings/app';
+import type { config, jobs } from '@/lib/models';
 import { pullOf, stateLabel } from '@/lib/jobs';
 import { listenersFor } from '@/lib/thread';
 import { Select } from '../shared';

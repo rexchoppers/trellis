@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Departments, Jobs, Thread } from '../../wailsjs/go/main/App';
-import type { config, jobs } from '../../wailsjs/go/models';
-import { EventsOn } from '../../wailsjs/runtime/runtime';
-
-type JobChanged = { path: string; id: string };
+import { Departments, Jobs, Thread } from '@bindings/app';
+import type { config, jobs } from '@/lib/models';
+import { Events } from '@wailsio/runtime';
+import { Job } from '../../bindings/events';
 
 // Calls fn on "job" events for this project, at most a few times a second.
 function useJobEvents(projectPath: string, fn: (id: string) => void) {
@@ -12,9 +11,9 @@ function useJobEvents(projectPath: string, fn: (id: string) => void) {
   useEffect(() => {
     const pending = new Set<string>();
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const off = EventsOn('job', (event: JobChanged) => {
-      if (event.path !== projectPath) return;
-      pending.add(event.id);
+    const off = Events.On(Job, ({ data }) => {
+      if (data.path !== projectPath) return;
+      pending.add(data.id);
       timer ??= setTimeout(() => {
         timer = undefined;
         for (const id of pending) latest.current(id);
@@ -34,12 +33,12 @@ export function useJobs(projectPath: string) {
   const [departments, setDepartments] = useState<config.Department[]>([]);
   const refresh = useCallback(() => {
     Jobs(projectPath)
-      .then(setList)
+      .then((loaded) => setList(loaded ?? []))
       .catch(() => undefined);
   }, [projectPath]);
   const reread = useCallback(() => {
     Departments(projectPath)
-      .then(setDepartments)
+      .then((loaded) => setDepartments(loaded ?? []))
       .catch(() => undefined);
   }, [projectPath]);
   useEffect(() => {
@@ -66,7 +65,7 @@ export function useThread(projectPath: string, id?: string) {
   const load = useCallback(() => {
     if (id)
       Thread(projectPath, id)
-        .then(setThread)
+        .then((loaded) => setThread(loaded ?? []))
         .catch(() => undefined);
   }, [projectPath, id]);
   useEffect(() => {

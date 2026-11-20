@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
-import { ForgetProject, ShowInFinder, StartJob } from '../../wailsjs/go/main/App';
-import type { jobs, setup } from '../../wailsjs/go/models';
+import { ForgetProject, ShowInFinder, StartJob } from '@bindings/app';
+import type { jobs, setup } from '@/lib/models';
 import { findAgent, jobTitle, stateLabel, useJobs } from '@/lib/jobs';
 import { cn } from '@/lib/utils';
 import type { AgentHit, View as OfficeView } from '../scenes/corporate-office/OfficeMap';
@@ -196,8 +196,8 @@ export function ProjectView({ project, switcher, onRemoved }: ProjectViewProps) 
               jobs={jobs}
               view={officeView}
               name={project.name}
-              places={project.places}
-              npcs={project.npcs}
+              places={project.places ?? []}
+              npcs={project.npcs ?? []}
               onAgent={(hit, at) => {
                 if (hit.run) {
                   setDispatch(undefined);

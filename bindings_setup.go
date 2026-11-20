@@ -4,11 +4,15 @@ import (
 	"os/exec"
 
 	"github.com/rexchoppers/trellis/internal/setup"
-	"github.com/wailsapp/wails/v2/pkg/runtime"
+	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
 func (a *App) ChooseFolder() (string, error) {
-	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{Title: "Choose the project folder"})
+	return application.Get().Dialog.OpenFile().
+		CanChooseDirectories(true).
+		CanChooseFiles(false).
+		SetTitle("Choose the project folder").
+		PromptForSingleSelection()
 }
 
 func (a *App) SaveProject(input setup.ProjectInput) (setup.ProjectStatus, error) {

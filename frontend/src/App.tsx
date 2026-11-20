@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Projects } from '../wailsjs/go/main/App';
-import type { setup } from '../wailsjs/go/models';
+import { Projects } from '@bindings/app';
+import type { setup } from '@/lib/models';
 import { AddProject } from './views/AddProject';
 import { ProjectView } from './views/ProjectView';
 import { message } from './views/shared';
@@ -15,8 +15,9 @@ export function App() {
     () =>
       Projects()
         .then((loaded) => {
-          setProjects(loaded);
-          return loaded;
+          const list = loaded ?? [];
+          setProjects(list);
+          return list;
         })
         .catch((err) => {
           setError(message(err));

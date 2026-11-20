@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { OpenPulls, ReviewComments } from '../../wailsjs/go/main/App';
-import type { config, jobs } from '../../wailsjs/go/models';
+import { OpenPulls, ReviewComments } from '@bindings/app';
+import type { config, Fields, jobs } from '@/lib/models';
 import { findAgent, jobTask, live, pullOf, stateLabel } from '@/lib/jobs';
 import { cn } from '@/lib/utils';
 import { message, Swatch } from './shared';
@@ -24,14 +24,14 @@ export function PRs({ projectPath, departments, list, open, onOpen }: { projectP
   // Only PRs still open on GitHub; checked again every minute, so merged ones drop off.
   const urls = [...rows.keys()];
   const key = urls.join(' ');
-  const [openOn, setOpenOn] = useState<Record<string, string>>();
+  const [openOn, setOpenOn] = useState<Fields>();
   const [checkFailed, setCheckFailed] = useState<string>();
   useEffect(() => {
     if (!urls.length) return undefined;
     let alive = true;
     const check = () =>
       OpenPulls(projectPath, urls)
-        .then((states) => alive && (setOpenOn(states), setCheckFailed(undefined)))
+        .then((states) => alive && (setOpenOn(states ?? {}), setCheckFailed(undefined)))
         .catch((err) => alive && setCheckFailed(message(err)));
     check();
     const timer = setInterval(check, 60_000);

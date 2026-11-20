@@ -1,6 +1,6 @@
 import { sample, sortBy } from 'es-toolkit';
 import * as THREE from 'three';
-import type { config } from '../../../wailsjs/go/models';
+import type { config } from '@/lib/models';
 import { addCigarette, addCup, disposeFigure, drawSmoke, figureBody, reducedMotion, seatFigure, stepToward } from './figure';
 import type { Floor, PlaceSpot } from './floor';
 import { makeBubble, makeTag, placeBubble, placeTag, setBubble, show, toScreen } from './overlay';

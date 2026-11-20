@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { config } from '../../wailsjs/go/models';
+import type { config } from '@/lib/models';
 import { layout, outcomeOf, route, wire, type Edge } from '@/lib/flow';
 import { cn } from '@/lib/utils';
 import { AgentCard } from './flow/AgentCard';

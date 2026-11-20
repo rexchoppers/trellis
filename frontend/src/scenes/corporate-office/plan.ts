@@ -1,6 +1,6 @@
 import { sortBy, sumBy } from 'es-toolkit';
 import * as THREE from 'three';
-import type { config } from '../../../wailsjs/go/models';
+import type { config } from '@/lib/models';
 import { MAX_DESKS } from '@/lib/desks';
 
 // Back (+z) to front (-z): your office (centred on the origin, door at -z), aisle, two rows of department zones either side

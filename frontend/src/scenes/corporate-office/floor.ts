@@ -1,7 +1,7 @@
 import { range, sortBy } from 'es-toolkit';
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import type { config } from '../../../wailsjs/go/models';
+import type { config } from '@/lib/models';
 import { plural } from '@/lib/utils';
 import { boxIn, callFace, chartFace, disposeGeometry, exitSign, floorName, glassWalls, materials, plaque, shadows, signFace, slabIn, STOREY, type Obstacle } from './build';
 import { kitMarkers, placeKit, placeKitMany, type KitPiece, type Spot } from './kit';

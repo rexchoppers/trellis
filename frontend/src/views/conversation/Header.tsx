@@ -1,4 +1,4 @@
-import type { jobs } from '../../../wailsjs/go/models';
+import type { jobs } from '@/lib/models';
 import { jobTitle, stateLabel } from '@/lib/jobs';
 import { cn } from '@/lib/utils';
 import { CloseButton, Swatch } from '../shared';
@@ -63,7 +63,7 @@ export function Header({ job, who, back, onClose, onOpenJob }: { job: jobs.Job; 
       )}
       {(job.children ?? []).length > 0 && (
         <div className="flex flex-wrap gap-x-3 gap-y-1">
-          {job.children.map((child) => (
+          {(job.children ?? []).map((child) => (
             <button key={child.job} type="button" className="sign text-[11px] text-muted-foreground hover:text-foreground" onClick={() => onOpenJob?.(child.job)}>
               {child.name} {child.job.slice(-6)} →
             </button>
@@ -71,7 +71,7 @@ export function Header({ job, who, back, onClose, onOpenJob }: { job: jobs.Job; 
         </div>
       )}
       {job.branch && <span className="font-mono text-[11px] text-muted-foreground">{job.branch}</span>}
-      {(job.progress ?? []).length > 0 && <Tracker steps={job.progress} working={job.state === 'working'} />}
+      {(job.progress ?? []).length > 0 && <Tracker steps={job.progress ?? []} working={job.state === 'working'} />}
     </header>
   );
 }

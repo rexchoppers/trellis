@@ -1,4 +1,4 @@
-import type { config, jobs } from '../../wailsjs/go/models';
+import type { config, Fields, jobs } from '@/lib/models';
 import { matches } from './flow';
 
 export const DECIDED: Record<string, string> = {
@@ -32,7 +32,7 @@ export function action(tool: string) {
 }
 
 // Only 'yes' counts: the data is all there is, so a field it lacks does not match.
-export function listenersFor(departments: config.Department[], event: string, data: Record<string, string>) {
+export function listenersFor(departments: config.Department[], event: string, data: Fields) {
   return departments.flatMap((d) =>
     (d.agents ?? []).filter((a) => (a.listens ?? []).some((l) => l.event === event && matches(l.when, data) === 'yes')).map((a) => a.name),
   );

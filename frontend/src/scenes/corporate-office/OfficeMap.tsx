@@ -3,7 +3,7 @@ import { clamp } from 'es-toolkit';
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import type { config, jobs } from '../../../wailsjs/go/models';
+import type { config, jobs } from '@/lib/models';
 import { STOREY } from './build';
 import { fireAlarm } from './alarm';
 import { installRoomLight } from './lighting';

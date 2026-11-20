@@ -17,3 +17,5 @@ assets/**/*.blend1
 # Local build state
 frontend/package.json.md5
 frontend/tsconfig.tsbuildinfo
+.task/
+build/darwin/icons.icns

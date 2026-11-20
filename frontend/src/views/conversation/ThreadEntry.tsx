@@ -1,6 +1,6 @@
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import type { config, jobs } from '../../../wailsjs/go/models';
+import type { config, Fields as FieldMap, jobs } from '@/lib/models';
 import { action, DECIDED, time, type Group } from '@/lib/thread';
 import { cn, plural } from '@/lib/utils';
 
@@ -27,7 +27,7 @@ export function Live({ name, last }: { name: string; last?: jobs.Entry }) {
   );
 }
 
-function Fields({ data }: { data?: Record<string, string> }) {
+function Fields({ data }: { data?: FieldMap | null }) {
   const entries = Object.entries(data ?? {}).sort(([a], [b]) => a.localeCompare(b));
   if (!entries.length) return null;
   return (
@@ -36,7 +36,7 @@ function Fields({ data }: { data?: Record<string, string> }) {
         <div key={key} className="contents">
           <dt className="sign text-[10px] text-muted-foreground">{key}</dt>
           <dd className="break-words">
-            {/^https?:\/\//.test(value) ? (
+            {/^https?:\/\//.test(value ?? '') ? (
               <a href={value} target="_blank" rel="noreferrer" className="underline underline-offset-2">
                 {value}
               </a>

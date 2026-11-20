@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Answer } from '../../wailsjs/go/main/App';
-import type { config, jobs } from '../../wailsjs/go/models';
+import { Answer } from '@bindings/app';
+import type { config, jobs } from '@/lib/models';
 import { live, useThread } from '@/lib/jobs';
 import { group } from '@/lib/thread';
 import { Composer } from './conversation/Composer';

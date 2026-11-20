@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
-import type { setup } from '../../wailsjs/go/models';
+import type { setup } from '@/lib/models';
 import { cn } from '@/lib/utils';
-import { WindowToggleMaximise } from '../../wailsjs/runtime/runtime';
+import { Window } from '@wailsio/runtime';
 import { shortPath } from './shared';
 
 // Wails reads this CSS property to let the element move the window.
@@ -16,7 +16,7 @@ export function TitleBar({ children }: { children: ReactNode }) {
       className="flex h-11 shrink-0 items-center gap-7 border-b bg-background pr-5 pl-[84px]"
       style={dragRegion}
       onDoubleClick={(e) => {
-        if (!(e.target as HTMLElement).closest('button, a, input, select, textarea, label')) WindowToggleMaximise();
+        if (!(e.target as HTMLElement).closest('button, a, input, select, textarea, label')) Window.ToggleMaximise();
       }}
     >
       {children}

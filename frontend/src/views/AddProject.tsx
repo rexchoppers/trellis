@@ -1,7 +1,6 @@
 import { FolderOpen } from 'lucide-react';
 import { useState } from 'react';
-import { ChooseFolder, SaveProject } from '../../wailsjs/go/main/App';
-import { setup } from '../../wailsjs/go/models';
+import { ChooseFolder, SaveProject } from '@bindings/app';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field, folderName, FormMessage, message, PageHeader, Section } from './shared';
@@ -26,7 +25,7 @@ export function AddProject({ onAdded }: { onAdded: (path: string) => void }) {
 
   const save = () => {
     setSaveError(undefined);
-    SaveProject(setup.ProjectInput.createFrom({ path, name }))
+    SaveProject({ path, name })
       .then((project) => onAdded(project.path))
       .catch((err) => setSaveError(message(err)));
   };
