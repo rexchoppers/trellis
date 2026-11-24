@@ -33,26 +33,30 @@ jobs:
 
       - name: Install dependencies
         run: |
-          go install github.com/wailsapp/wails/v2/cmd/wails@v2.16.0
+          go install github.com/wailsapp/wails/v3/cmd/wails3@v3.1.0
           go mod download
           pnpm --dir frontend install --frozen-lockfile
 
       - name: Set version from tag
         run: |
-          jq --arg v "${GITHUB_REF_NAME#v}" '.info.productVersion = $v' wails.json > wails.json.tmp
-          mv wails.json.tmp wails.json
+          plutil -replace CFBundleShortVersionString -string "${GITHUB_REF_NAME#v}" build/darwin/Info.plist
+          plutil -replace CFBundleVersion -string "${GITHUB_REF_NAME#v}" build/darwin/Info.plist
 
       - name: Build
-        run: wails build -clean -platform darwin/universal
+        run: |
+          wails3 task darwin:build ARCH=arm64 OUTPUT=build/bin/trellis-arm64
+          wails3 task darwin:build ARCH=amd64 OUTPUT=build/bin/trellis-amd64
+          wails3 tool lipo -input build/bin/trellis-arm64 -input build/bin/trellis-amd64 -output build/bin/trellis
+          wails3 task darwin:create:app:bundle
 
       - name: Vet
         run: go vet ./...
 
       - name: Package
         run: |
-          app=$(ls -d build/bin/*.app | head -1)
           mkdir dist
-          ditto -c -k --keepParent "$app" "dist/Trellis-macos-$GITHUB_REF_NAME.zip"
+          mv build/bin/trellis.app build/bin/Trellis.app
+          ditto -c -k --keepParent build/bin/Trellis.app "dist/Trellis-macos-$GITHUB_REF_NAME.zip"
           cat > dist/README.txt <<'TXT'
           Trellis beta build (unsigned).
 
