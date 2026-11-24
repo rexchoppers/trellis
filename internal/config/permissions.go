@@ -19,7 +19,11 @@ const (
 // Listing it gives an agent Trellis's artifact tool: claude -p has no Artifact tool of its own.
 const ArtifactTool = "Artifact"
 
-var BuiltIn = []string{"Read", "Grep", "Glob", "LS", "Bash", "Edit", "Write", "MultiEdit", "NotebookEdit", "WebFetch", "WebSearch", "Task"}
+// Off unless an agent's permissions list them.
+var BuiltIn = []string{"Read", "Grep", "Glob", "LS", "Bash", "Edit", "Write", "MultiEdit", "NotebookEdit", "WebFetch", "WebSearch", "Task", "Monitor", "TaskStop", "PushNotification", "SendMessage"}
+
+// Always off, whatever an agent's permissions say: Trellis owns waking, asking and worktrees.
+var sessionTools = []string{"ScheduleWakeup", "CronCreate", "CronDelete", "CronList", "RemoteTrigger", "AskUserQuestion", "EnterPlanMode", "ExitPlanMode", "EnterWorktree", "ExitWorktree"}
 
 // Server name to the project's nicknames for it.
 type Names map[string][]string
@@ -75,12 +79,9 @@ func segments(tool string, input json.RawMessage) []json.RawMessage {
 }
 
 func (a Agent) Off() []string {
-	var off []string
+	off := slices.Clone(sessionTools)
 	for _, tool := range BuiltIn {
-		listed := slices.ContainsFunc(slices.Concat(a.Permissions.Free, a.Permissions.Ask), func(rule string) bool {
-			return strings.SplitN(strings.TrimSpace(rule), "(", 2)[0] == tool
-		})
-		if !listed {
+		if !a.Lists(tool) {
 			off = append(off, tool)
 		}
 	}
